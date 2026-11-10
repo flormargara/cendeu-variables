@@ -1,0 +1,549 @@
+{
+  "version": "0.1.0",
+  "creado": "2026-11-10T00:06:52",
+  "fuente": {
+    "archivo_variables": "vars_cendeu_202509.parquet",
+    "pct_muestra": 20
+  },
+  "poblacion": "tipo_persona = 'humana' AND sit_actual = 1",
+  "target": "target_sit3p: situación >= 3 en cualquier entidad en los meses de desempeño",
+  "convencion_woe": "ln(%buenos/%malos); bin = desde < x <= hasta (None = infinito)",
+  "escala": {
+    "base": 600,
+    "odds_buenos_malos": 50,
+    "pdo": 20,
+    "factor": 28.853901,
+    "offset": 487.122876
+  },
+  "intercepto": -1.795508,
+  "variables": [
+    {
+      "nombre": "n_no_bancos_actual",
+      "coef": -0.568699,
+      "iv": 0.4706,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.0,
+          "nulo": false,
+          "n": 1020070,
+          "tasa_malos": 0.06866,
+          "woe": 0.82004,
+          "puntos": 90
+        },
+        {
+          "desde": 0.0,
+          "hasta": 1.0,
+          "nulo": false,
+          "n": 778433,
+          "tasa_malos": 0.17053,
+          "woe": -0.20554,
+          "puntos": 74
+        },
+        {
+          "desde": 1.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 321132,
+          "tasa_malos": 0.31497,
+          "woe": -1.010474,
+          "puntos": 60
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 77
+        }
+      ]
+    },
+    {
+      "nombre": "ratio_deuda_vs_max",
+      "coef": -0.659719,
+      "iv": 0.3254,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.4322187095337462,
+          "nulo": false,
+          "n": 423927,
+          "tasa_malos": 0.06863,
+          "woe": 0.820547,
+          "puntos": 93
+        },
+        {
+          "desde": 0.4322187095337462,
+          "hasta": 0.49437614007671205,
+          "nulo": false,
+          "n": 105982,
+          "tasa_malos": 0.07606,
+          "woe": 0.709625,
+          "puntos": 90
+        },
+        {
+          "desde": 0.49437614007671205,
+          "hasta": 0.551185822601402,
+          "nulo": false,
+          "n": 105982,
+          "tasa_malos": 0.08049,
+          "woe": 0.648148,
+          "puntos": 89
+        },
+        {
+          "desde": 0.551185822601402,
+          "hasta": 0.6526783871417363,
+          "nulo": false,
+          "n": 211963,
+          "tasa_malos": 0.09187,
+          "woe": 0.503607,
+          "puntos": 87
+        },
+        {
+          "desde": 0.6526783871417363,
+          "hasta": 0.7404963465945855,
+          "nulo": false,
+          "n": 211964,
+          "tasa_malos": 0.10872,
+          "woe": 0.316457,
+          "puntos": 83
+        },
+        {
+          "desde": 0.7404963465945855,
+          "hasta": 0.823292381461452,
+          "nulo": false,
+          "n": 211963,
+          "tasa_malos": 0.13105,
+          "woe": 0.104281,
+          "puntos": 79
+        },
+        {
+          "desde": 0.823292381461452,
+          "hasta": 0.9013338377174247,
+          "nulo": false,
+          "n": 211963,
+          "tasa_malos": 0.16559,
+          "woe": -0.170245,
+          "puntos": 74
+        },
+        {
+          "desde": 0.9013338377174247,
+          "hasta": 0.9389763142947223,
+          "nulo": false,
+          "n": 105982,
+          "tasa_malos": 0.20119,
+          "woe": -0.408614,
+          "puntos": 69
+        },
+        {
+          "desde": 0.9389763142947223,
+          "hasta": 0.9779606090269494,
+          "nulo": false,
+          "n": 105982,
+          "tasa_malos": 0.2302,
+          "woe": -0.580271,
+          "puntos": 66
+        },
+        {
+          "desde": 0.9779606090269494,
+          "hasta": null,
+          "nulo": false,
+          "n": 423927,
+          "tasa_malos": 0.25271,
+          "woe": -0.703239,
+          "puntos": 64
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 77
+        }
+      ]
+    },
+    {
+      "nombre": "n_ent_actual",
+      "coef": -0.37066,
+      "iv": 0.2971,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 1.0,
+          "nulo": false,
+          "n": 1205606,
+          "tasa_malos": 0.09543,
+          "woe": 0.461602,
+          "puntos": 82
+        },
+        {
+          "desde": 1.0,
+          "hasta": 2.0,
+          "nulo": false,
+          "n": 546120,
+          "tasa_malos": 0.15516,
+          "woe": -0.092757,
+          "puntos": 76
+        },
+        {
+          "desde": 2.0,
+          "hasta": 3.0,
+          "nulo": false,
+          "n": 224450,
+          "tasa_malos": 0.23301,
+          "woe": -0.596029,
+          "puntos": 71
+        },
+        {
+          "desde": 3.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 143459,
+          "tasa_malos": 0.36136,
+          "woe": -1.217969,
+          "puntos": 64
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 77
+        }
+      ]
+    },
+    {
+      "nombre": "ent_nuevas_6",
+      "coef": -0.391308,
+      "iv": 0.2708,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.0,
+          "nulo": false,
+          "n": 1494464,
+          "tasa_malos": 0.09991,
+          "woe": 0.41075,
+          "puntos": 82
+        },
+        {
+          "desde": 0.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 625171,
+          "tasa_malos": 0.24731,
+          "woe": -0.674433,
+          "puntos": 69
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 77
+        }
+      ]
+    },
+    {
+      "nombre": "crec_deuda_hist",
+      "coef": -0.410257,
+      "iv": 0.1996,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": -0.3563851538262868,
+          "nulo": false,
+          "n": 349178,
+          "tasa_malos": 0.07454,
+          "woe": 0.731484,
+          "puntos": 86
+        },
+        {
+          "desde": -0.3563851538262868,
+          "hasta": -0.16605825184488707,
+          "nulo": false,
+          "n": 174589,
+          "tasa_malos": 0.08522,
+          "woe": 0.58601,
+          "puntos": 84
+        },
+        {
+          "desde": -0.16605825184488707,
+          "hasta": 0.032202502122003346,
+          "nulo": false,
+          "n": 174588,
+          "tasa_malos": 0.09366,
+          "woe": 0.482268,
+          "puntos": 83
+        },
+        {
+          "desde": 0.032202502122003346,
+          "hasta": 0.1498759885444505,
+          "nulo": false,
+          "n": 87296,
+          "tasa_malos": 0.10425,
+          "woe": 0.363331,
+          "puntos": 81
+        },
+        {
+          "desde": 0.1498759885444505,
+          "hasta": 0.28371637269292815,
+          "nulo": false,
+          "n": 87322,
+          "tasa_malos": 0.11297,
+          "woe": 0.273244,
+          "puntos": 80
+        },
+        {
+          "desde": 0.28371637269292815,
+          "hasta": 0.6238132014718869,
+          "nulo": false,
+          "n": 174560,
+          "tasa_malos": 0.12908,
+          "woe": 0.121616,
+          "puntos": 78
+        },
+        {
+          "desde": 0.6238132014718869,
+          "hasta": 1.1418441603146545,
+          "nulo": false,
+          "n": 174588,
+          "tasa_malos": 0.14874,
+          "woe": -0.042975,
+          "puntos": 76
+        },
+        {
+          "desde": 1.1418441603146545,
+          "hasta": 2.0982329491790286,
+          "nulo": false,
+          "n": 174590,
+          "tasa_malos": 0.17005,
+          "woe": -0.202181,
+          "puntos": 75
+        },
+        {
+          "desde": 2.0982329491790286,
+          "hasta": 9.46348944064779,
+          "nulo": false,
+          "n": 261882,
+          "tasa_malos": 0.19878,
+          "woe": -0.393491,
+          "puntos": 72
+        },
+        {
+          "desde": 9.46348944064779,
+          "hasta": null,
+          "nulo": false,
+          "n": 87295,
+          "tasa_malos": 0.24194,
+          "woe": -0.645376,
+          "puntos": 69
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 373747,
+          "tasa_malos": 0.20425,
+          "woe": -0.427476,
+          "puntos": 72
+        }
+      ]
+    },
+    {
+      "nombre": "meses_desde_sit2p",
+      "coef": -0.908272,
+      "iv": 0.198,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 1.0,
+          "nulo": false,
+          "n": 26249,
+          "tasa_malos": 0.46809,
+          "woe": -1.659649,
+          "puntos": 33
+        },
+        {
+          "desde": 1.0,
+          "hasta": 2.0,
+          "nulo": false,
+          "n": 21858,
+          "tasa_malos": 0.45114,
+          "woe": -1.591382,
+          "puntos": 35
+        },
+        {
+          "desde": 2.0,
+          "hasta": 3.0,
+          "nulo": false,
+          "n": 20250,
+          "tasa_malos": 0.3803,
+          "woe": -1.299176,
+          "puntos": 43
+        },
+        {
+          "desde": 3.0,
+          "hasta": 4.0,
+          "nulo": false,
+          "n": 16704,
+          "tasa_malos": 0.34357,
+          "woe": -1.14006,
+          "puntos": 47
+        },
+        {
+          "desde": 4.0,
+          "hasta": 5.0,
+          "nulo": false,
+          "n": 14424,
+          "tasa_malos": 0.32467,
+          "woe": -1.055092,
+          "puntos": 49
+        },
+        {
+          "desde": 5.0,
+          "hasta": 7.0,
+          "nulo": false,
+          "n": 24614,
+          "tasa_malos": 0.30921,
+          "woe": -0.983683,
+          "puntos": 51
+        },
+        {
+          "desde": 7.0,
+          "hasta": 9.0,
+          "nulo": false,
+          "n": 20199,
+          "tasa_malos": 0.27605,
+          "woe": -0.823373,
+          "puntos": 55
+        },
+        {
+          "desde": 9.0,
+          "hasta": 10.0,
+          "nulo": false,
+          "n": 11295,
+          "tasa_malos": 0.27357,
+          "woe": -0.81097,
+          "puntos": 56
+        },
+        {
+          "desde": 10.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 9122,
+          "tasa_malos": 0.2734,
+          "woe": -0.810152,
+          "puntos": 56
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 1954920,
+          "tasa_malos": 0.12527,
+          "woe": 0.156037,
+          "puntos": 81
+        }
+      ]
+    },
+    {
+      "nombre": "racha_sit1_actual",
+      "coef": -0.364671,
+      "iv": 0.1592,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 4.0,
+          "nulo": false,
+          "n": 345985,
+          "tasa_malos": 0.24176,
+          "woe": -0.644402,
+          "puntos": 70
+        },
+        {
+          "desde": 4.0,
+          "hasta": 6.0,
+          "nulo": false,
+          "n": 110668,
+          "tasa_malos": 0.19733,
+          "woe": -0.384386,
+          "puntos": 73
+        },
+        {
+          "desde": 6.0,
+          "hasta": 11.0,
+          "nulo": false,
+          "n": 214964,
+          "tasa_malos": 0.18284,
+          "woe": -0.290197,
+          "puntos": 74
+        },
+        {
+          "desde": 11.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 1448018,
+          "tasa_malos": 0.1099,
+          "woe": 0.304298,
+          "puntos": 80
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 77
+        }
+      ]
+    }
+  ],
+  "metricas": {
+    "n_train": 2119635,
+    "n_test": 906199,
+    "tasa_malos_train": 0.14339,
+    "gini_train": 0.5382,
+    "gini_test": 0.5415,
+    "ks_test": 0.413
+  },
+  "iv_todas": {
+    "n_no_bancos_actual": 0.4706,
+    "ratio_deuda_vs_max": 0.3254,
+    "n_ent_actual": 0.2971,
+    "n_ent_hist": 0.2953,
+    "n_ent_max_hist": 0.2799,
+    "ent_nuevas_6": 0.2708,
+    "ent_nuevas_3": 0.2009,
+    "crec_deuda_hist": 0.1996,
+    "meses_desde_sit2p": 0.198,
+    "peor_sit_hist": 0.1852,
+    "meses_sit2p_hist": 0.1852,
+    "cambios_sit_hist": 0.1759,
+    "racha_sit1_actual": 0.1592,
+    "crec_deuda_6": 0.134,
+    "crec_deuda_3": 0.1206,
+    "deuda_actual": 0.0958,
+    "deuda_prom_3": 0.0823,
+    "meses_desde_sit3p": 0.0704,
+    "deuda_prom_6": 0.0651,
+    "antiguedad_meses": 0.0582,
+    "meses_con_deuda_hist": 0.0456,
+    "n_bancos_actual": 0.0424,
+    "solo_no_bancario": 0.0424,
+    "deuda_max_hist": 0.0414,
+    "ent_canceladas_hist": 0.0408,
+    "ent_canceladas_6": 0.0295,
+    "peor_sit_prev3": 0.0041,
+    "empeoro_3": 0.0041
+  }
+}

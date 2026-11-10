@@ -1,0 +1,16 @@
+# Entornos
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.DS_Store
+
+# Datos: NUNCA se versionan (Ley 25.326 – datos personales)
+data/
+*.7z
+*.7Z
+*.txt
+*.parquet
+*.duckdb
+*.duckdb.wal
+tmp_duck/
