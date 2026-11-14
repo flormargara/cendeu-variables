@@ -14,3 +14,6 @@ data/
 *.duckdb
 *.duckdb.wal
 tmp_duck/
+
+# Material de referencia de terceros (no versionar)
+feature_store_crc/
