@@ -54,6 +54,14 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("documentar", help="v2: genera docs/variables.md y docs/diccionario_variables.csv desde el catálogo")
     p.add_argument("--catalogo", default="catalogo/variables.yaml"); p.add_argument("--docs", default="docs")
 
+    p = sub.add_parser("poder", help="v2: informe de poder (IV, Gini, KS, PSI, correlaciones, incremental vs v1)")
+    p.add_argument("dir_variables"); p.add_argument("--salida", default="reportes/poder_v2")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--oot", type=int, nargs="*", help="fechas out-of-time (default: las dos últimas)")
+    p.add_argument("--pct-muestra", type=int, default=10)
+    p.add_argument("--vars-v1", help="Parquet de variables v1 para el valor incremental")
+    p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json"); p.add_argument("--obs-v1", type=int, default=202509)
+
     p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
     p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
     p.add_argument("--perfil", default="fmargara")
@@ -88,6 +96,11 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit("\n".join(c.errores))
         print(catalogo.escribir_diccionario(c, Path(a.docs) / "diccionario_variables.csv"))
         print(catalogo.escribir_documento(c, Path(a.docs) / "variables.md"))
+    elif a.cmd == "poder":
+        from . import poder
+        r = poder.informe(a.dir_variables, a.catalogo, a.salida, fechas_oot=a.oot, pct_muestra=a.pct_muestra,
+                          vars_v1=a.vars_v1, modelo_v1=a.modelo_v1 if a.vars_v1 else None, obs_v1=a.obs_v1, memory_limit=a.memoria)
+        print(r.head(25).to_string(index=False))
     elif a.cmd == "subir":
         filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
         malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]
