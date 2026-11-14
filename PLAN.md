@@ -45,8 +45,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 2 | Catálogo de variables por bloques | [`catalogo/variables.yaml`](catalogo/variables.yaml) (149 variables, validado por `cendeu.catalogo` y test) | hecho, a revisar |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | [`src/cendeu/v2.py`](src/cendeu/v2.py), [`src/cendeu/s3.py`](src/cendeu/s3.py), [`tests/test_v2.py`](tests/test_v2.py) | en curso |
 | 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho |
-| 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | `docs/variables_mix.md` | pendiente |
-| 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | informe HTML | pendiente |
+| 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | [`docs/variables_mix.md`](docs/variables_mix.md) | hecho (diseño; implementar cuando haya datos propios) |
+| 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | [`src/cendeu/poder.py`](src/cendeu/poder.py) (`cendeu poder`) → `reportes/poder_v2/` + informe HTML | código listo y testeado; falta correrlo sobre las 7 fechas |
 | 6 | Selección y nuevo scorecard | `modelos/` | pendiente |
 
 ## Bloques de variables (Fase 2)
