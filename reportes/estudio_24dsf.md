@@ -16,7 +16,7 @@ Fase 1 del [plan v2](../PLAN.md). Objetivo: entender la calidad y la estructura 
 | 4 | **21% de los CUITs tiene huecos** en su serie (aparece, desaparece, reaparece). | Las diferencias mes a mes y el RSI tienen que calcularse sobre una **grilla densa** CUIT × mes (ausente = sin deuda informada). |
 | 5 | **Roll rates altos**: de situación 2, el 34% pasa a 3 al mes siguiente y sólo el 17% se cura; de 3, el 29% pasa a 4. | Las transiciones (bloque 3) son una señal fuerte; la situación 2 es el estado clave para alertas tempranas. |
 | 6 | **Entradas directas en situación 5**: 514 mil apariciones de CUITs que entran a la central ya en situación 5 (3,3% de las altas). | Probable compra/cesión de cartera morosa: variable análoga a "cartera vendida" del CRC. |
-| 7 | El campo **`flag` no tiene información** (460 filas en 1 sobre 902 M). | Se descarta. |
+| 7 | El campo `flag` es **Proceso judicial/Revisión** según el LEAME (0 = no observado, 1 = proceso judicial, 2 = en revisión, Ley 25.326). Sólo 460 filas en 1 sobre 902 M, ninguna en 2. | Poder casi nulo por frecuencia; se conserva como flag y se reevalúa con el informe de poder. |
 | 8 | Las situaciones **6 y 11 no aparecen**. | Se simplifica el tratamiento de situación (1 a 5). |
 | 9 | **Duplicados** CUIT × entidad × período despreciables (~100 filas por mes). | Se mantiene la regla actual: peor situación y suma de montos. |
 | 10 | 101 filas con `tipo_id` 98/99 y CUIT inválido. | Se excluyen. |
@@ -57,6 +57,8 @@ Fase 1 del [plan v2](../PLAN.md). Objetivo: entender la calidad y la estructura 
 | 70116 | 202509 | 55547 | 4.810 | 90% |
 
 Criterio: la entidad no informa al mes siguiente, tenía ≥100 CUITs y ≥30% de ellos aparece en una misma entidad con la que no operaban. Los casos 259→285 y 150→7 son consistentes con adquisiciones bancarias conocidas del período; conviene confirmarlos con la tabla de entidades.
+
+Según el LEAME, el 24DSF **sólo incluye deudores de entidades activas y, de las entidades dadas de baja, únicamente los registros en situación normal**. Para una entidad absorbida, la historia en situación 2+ desaparece del archivo: la deuda irregular previa a la fusión no se ve bajo el código viejo.
 
 **Tratamiento propuesto**: tabla `entidades_equivalencias` (entidad origen → destino, desde período). Para las variables de relación con el sistema (altas, bajas, principalidad) se reemplaza el código de origen por el de destino en toda la historia.
 
@@ -108,6 +110,7 @@ Colas muy largas (máximos de grandes empresas): usar ratios, logaritmos o binni
 2. **Grilla densa** CUIT × mes para todas las variables temporales.
 3. **Mapa de equivalencias de entidades** para neutralizar fusiones.
 4. **Conseguir la tabla de entidades BCRA** (nombre y tipo) para el bloque de mix por tipo de entidad.
-5. Descartar `flag`, `tipo_id` ≠ 11 y tratar situación en escala 1–5.
+5. Descartar `tipo_id` ≠ 11 y tratar situación en escala 1–5; `flag` se renombra como proceso judicial.
+8. **Otras fuentes del mismo paquete del BCRA** (ver LEAME): `maeent.txt` (maestro de entidades), `1DSF.txt` (fecha desde la cual el deudor está en situación 1 ininterrumpida, sin el tope de 24 meses) y el mensual `deudores.txt`, que agrega días de atraso, refinanciaciones, recategorización obligatoria, situación jurídica, garantías y previsiones.
 6. Nueva variable: **aparición directa en situación ≥4** (proxy de cartera cedida o comprada).
 7. Medir **PSI por fecha de observación** en el informe de poder, dada la tendencia de deterioro del sistema.
