@@ -10,7 +10,7 @@ Fase 1 del [plan v2](../PLAN.md). Objetivo: entender la calidad y la estructura 
 
 | # | Hallazgo | Impacto en el diseño |
 |---|---|---|
-| 1 | **202609 está incompleto**: faltan 68 entidades que informaron en 202608 (2,9% de las filas, 0,5% del monto; la mayor con 306 mil filas). | Último mes no confiable para altas/bajas y deuda. Los CUITs de esas entidades parecen "cancelar" sin hacerlo. |
+| 1 | **202609 está incompleto en el 24DSF**: faltan 68 entidades que informaron en 202608 (2,9% de las filas, 0,5% del monto; la mayor con 306 mil filas). **Resuelto**: el `deudores.txt` mensual de 202609 trae esas entidades (69, 1,2 M filas) y coincide exactamente con el 24DSF en las 476 restantes. Ver [fuentes BCRA y ARCA](fuentes_bcra_arca.md). | Completar el último mes del 24DSF con el mensual. |
 | 2 | **La irregularidad crece fuerte en la ventana**: filas en situación ≥2 pasan de 13% a 28%; monto en situación ≥2 de 3% a 14%. | Tasa de default distinta por fecha de observación → medir estabilidad (PSI) y calibrar por cohorte. |
 | 3 | **5 fusiones/migraciones de cartera** detectadas: entre 84% y 90% de los clientes de la entidad que deja de informar aparecen al mes siguiente en una misma entidad nueva para ellos. | Sin corrección, generan "altas" y "bajas" falsas y cambios de principalidad artificiales. Hace falta un mapa de equivalencias de entidades. |
 | 4 | **21% de los CUITs tiene huecos** en su serie (aparece, desaparece, reaparece). | Las diferencias mes a mes y el RSI tienen que calcularse sobre una **grilla densa** CUIT × mes (ausente = sin deuda informada). |
@@ -60,7 +60,9 @@ Criterio: la entidad no informa al mes siguiente, tenía ≥100 CUITs y ≥30% d
 
 Según el LEAME, el 24DSF **sólo incluye deudores de entidades activas y, de las entidades dadas de baja, únicamente los registros en situación normal**. Para una entidad absorbida, la historia en situación 2+ desaparece del archivo: la deuda irregular previa a la fusión no se ve bajo el código viejo.
 
-**Tratamiento propuesto**: tabla `entidades_equivalencias` (entidad origen → destino, desde período). Para las variables de relación con el sistema (altas, bajas, principalidad) se reemplaza el código de origen por el de destino en toda la historia.
+**Confirmado con el maestro de entidades** (`Maeent.txt`): ver [`referencias/entidades_equivalencias.csv`](../referencias/entidades_equivalencias.csv), que suma 3 casos más que el detector no capturó (cadena Mifloder con un mes de hueco, Córdoba Valores y Finanrol).
+
+**Tratamiento**: tabla `entidades_equivalencias` (entidad origen → destino, desde período). Para las variables de relación con el sistema (altas, bajas, principalidad) se reemplaza el código de origen por el de destino en toda la historia.
 
 ## 3. CUITs
 
@@ -106,11 +108,11 @@ Colas muy largas (máximos de grandes empresas): usar ratios, logaritmos o binni
 
 ## Decisiones para las fases 2 y 3
 
-1. **Último mes válido**: hasta confirmar 202609, las fechas de observación para modelar van de 202509 a 202603 (12 meses de historia + 6 de desempeño, terminando en 202609). En el target a 6 meses, la falta de entidades en 202609 puede subestimar levemente el default del último mes de desempeño: se medirá con y sin 202609.
+1. **Último mes válido**: 202609, completando el 24DSF con las 69 entidades del mensual. Las fechas de observación para modelar van de 202509 a 202603 (12 meses de historia + 6 de desempeño, terminando en 202609).
 2. **Grilla densa** CUIT × mes para todas las variables temporales.
 3. **Mapa de equivalencias de entidades** para neutralizar fusiones.
-4. **Conseguir la tabla de entidades BCRA** (nombre y tipo) para el bloque de mix por tipo de entidad.
+4. **Tabla de entidades BCRA** (nombre y tipo) para el bloque de mix: hecha en [`referencias/entidades.csv`](../referencias/entidades.csv).
 5. Descartar `tipo_id` ≠ 11 y tratar situación en escala 1–5; `flag` se renombra como proceso judicial.
-8. **Otras fuentes del mismo paquete del BCRA** (ver LEAME): `maeent.txt` (maestro de entidades), `1DSF.txt` (fecha desde la cual el deudor está en situación 1 ininterrumpida, sin el tope de 24 meses) y el mensual `deudores.txt`, que agrega días de atraso, refinanciaciones, recategorización obligatoria, situación jurídica, garantías y previsiones.
 6. Nueva variable: **aparición directa en situación ≥4** (proxy de cartera cedida o comprada).
 7. Medir **PSI por fecha de observación** en el informe de poder, dada la tendencia de deterioro del sistema.
+8. **Otras fuentes del mismo paquete del BCRA** (ver LEAME; revisadas en [fuentes BCRA y ARCA](fuentes_bcra_arca.md)): `maeent.txt` (maestro de entidades), `1DSF.txt` (fecha desde la cual el deudor está en situación 1 ininterrumpida, sin el tope de 24 meses) y el mensual `deudores.txt`, que agrega días de atraso, refinanciaciones, recategorización obligatoria, situación jurídica, garantías y previsiones.

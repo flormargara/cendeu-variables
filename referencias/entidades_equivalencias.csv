@@ -1,0 +1,9 @@
+entidad_origen,entidad_destino,desde_periodo,tipo,evidencia
+259,285,202411,absorcion,"BANCO BMA -> BANCO MACRO; 88% de los CUITs de 259 en 202410 aparecen en 285 en 202411"
+150,7,202506,absorcion,"Banco GGAL -> BANCO DE GALICIA; 85% de los CUITs migran en 202506"
+70218,55514,202504,recodificacion,"CARTASUR CARDS con dos códigos; 90% de los CUITs migran en 202504"
+70116,55547,202510,recodificacion,"SISTEMAS UNIFICADOS DE CREDITO DIRIGIDO con dos códigos; 90% migran en 202510"
+55385,55494,202411,recodificacion,"Mifloder SAS: 55385 (202410) -> 72632 (202411) -> 55494 (desde 202501); 84% y 85% en cada paso"
+72632,55494,202412,recodificacion,"Mifloder SAS, código intermedio (sólo 202411)"
+72616,55538,202508,recodificacion,"CORDOBA VALORES con dos códigos; 5 de 6 CUITs migran"
+72630,72649,202503,recodificacion_con_hueco,"FINANROL SA con dos códigos; 72630 informa hasta 202502 y 72649 desde 202603; 27% de los CUITs reaparecen"

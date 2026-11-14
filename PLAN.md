@@ -31,7 +31,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | # | Fase | Entregable | Estado |
 |---|---|---|---|
 | 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | hecho (tamaños verificados contra local) |
-| 1 | Estudio de datos del 24DSF | [`reportes/estudio_24dsf.md`](reportes/estudio_24dsf.md) | hecho (pendiente: tabla de entidades BCRA, confirmar 202609) |
+| 1 | Estudio de datos del 24DSF | [`reportes/estudio_24dsf.md`](reportes/estudio_24dsf.md) | hecho |
+| 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (falta subirlas a S3) |
 | 2 | Catálogo de variables por bloques | `catalogo/variables.yaml` | pendiente |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | `src/cendeu/` | pendiente |
 | 4 | Documentación de variables (diccionario + documento técnico) | `docs/diccionario_variables.csv`, `docs/variables.md` | pendiente |
@@ -47,8 +48,10 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 4. **Velocidad**: VAR mes a mes, TEN (actual vs hace N meses), FMX (actual / total ventana), aceleración, STD y CV.
 5. **Momentum (RSI)** 3/6/12 sobre deuda, situación, cantidad de entidades y deuda irregular.
 6. **Relación con el sistema**: entidades, altas y bajas, principalidad y cambio de principalidad, concentración (HHI).
-7. **Mix por tipo de entidad**: entropía de Shannon y participación por tipo (requiere tabla de entidades BCRA).
-8. **Alertas combinadas**.
+7. **Mix por tipo de entidad**: entropía de Shannon y participación por tipo (`tipo_agrupado` de `referencias/entidades.csv`).
+8. **Foto actual del mensual**: días de atraso, refinanciación, recategorización obligatoria, situación jurídica, garante, deuda con fideicomiso de recupero.
+9. **Persona (padrón ARCA y 1DSF)**: edad o antigüedad de la empresa, actividad registrada, provincia, meses en situación normal. Sexo sólo para monitorear sesgos.
+10. **Alertas combinadas** (incluye fallecido con deuda).
 
 ## Diferencias con el CRC a tener en cuenta
 
