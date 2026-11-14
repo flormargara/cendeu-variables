@@ -9,7 +9,7 @@ Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA,
 | Nomenclatura | Unificada: `EX_CEN_<OPERACION>_<DESCRIPCION>_<VENTANA>`. No se mantienen los nombres v1. |
 | Ventanas | 3, 6 y 12 meses. |
 | Target | Situación ≥3 en los **6 meses** siguientes (permite varias fechas de observación, validación *out-of-time* y PSI). Target a 12 meses queda para iteraciones futuras. |
-| Almacenamiento | `s3://data-cendeu-raw` (perfil `fmargara`), una carpeta por período. |
+| Almacenamiento | `s3://data-cendeu-raw` (perfil `fmargara`, política [`infra/cendeu-s3-policy.json`](infra/cendeu-s3-policy.json)), una carpeta por período. |
 | v1 | Variables y scores v1 se suben sólo como línea de base; se borran cuando exista v2 (*fresh start*). |
 | Repo | Se mantiene el repo actual; el rediseño se hace sobre él. |
 
@@ -20,8 +20,14 @@ s3://data-cendeu-raw/
   deudores/periodo=AAAAMM/data.parquet        un mes de la central, todas las entidades
   variables/periodo_obs=AAAAMM/…              variables por CUIT a esa fecha
   scores/periodo_obs=AAAAMM/…
+  deudores_mensual/periodo=AAAAMM/data.parquet  central mensual completa (24 campos)
+  entidades/periodo=AAAAMM/maeent.parquet     maestro de entidades
+  desde_sit1/periodo=AAAAMM/data.parquet      1DSF: desde cuándo en situación 1
+  rectificativas/publicado=AAAAMM/…           inf_ret e inf_retparc
+  padron/corte=AAAAMMDD/…                     padrón ARCA y nomenclador de actividades
   docs/                                       diccionario e informes
-  _control/ingestas.csv                       registro por período: corte de origen, filas, CUITs, entidades, monto, estado
+  _control/ingestas.csv                       registro por período del bianual: corte de origen, filas, CUITs, entidades, monto, estado
+  _control/fuentes.csv                        registro de las demás fuentes: archivo de origen, filas, bytes, ruta
 ```
 
 Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** los 23 solapados (el BCRA rectifica), dejando constancia en `_control/ingestas.csv`.
@@ -32,7 +38,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 |---|---|---|---|
 | 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | hecho (tamaños verificados contra local) |
 | 1 | Estudio de datos del 24DSF | [`reportes/estudio_24dsf.md`](reportes/estudio_24dsf.md) | hecho |
-| 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (falta subirlas a S3) |
+| 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (subidas a S3, registro en `_control/fuentes.csv`) |
 | 2 | Catálogo de variables por bloques | `catalogo/variables.yaml` | pendiente |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | `src/cendeu/` | pendiente |
 | 4 | Documentación de variables (diccionario + documento técnico) | `docs/diccionario_variables.csv`, `docs/variables.md` | pendiente |
