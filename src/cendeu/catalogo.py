@@ -111,6 +111,127 @@ def validar(cat: Catalogo) -> list[str]:
     return errores
 
 
+COLUMNAS_DICCIONARIO = [
+    "VARIABLE", "EMPRESA", "UNIDAD NEGOCIO", "OPERACION", "DESCRIPCION", "VENTANA TIEMPO", "ORIGEN", "DEFINICION",
+    "AGRUPADOR", "UNIDAD TIEMPO", "ACTUALIZACION", "REFERENTE", "TIPO DATO", "CLASE", "NULOS", "LINK", "OBSERVACIONES",
+    # agregadas respecto de la plantilla CRC
+    "BLOQUE", "USO", "SENTIDO ESPERADO", "UNIDAD", "DISPONIBLE DESDE", "SQL",
+]
+_TIPO = {"INTEGER": "int", "FLAG": "int", "DECIMAL": "float", "CATEGORICA": "string"}
+_CLASE = {"INTEGER": "numeric", "DECIMAL": "numeric", "FLAG": "binary", "CATEGORICA": "category"}
+
+
+def filas_diccionario(cat: Catalogo, link_doc: str = "docs/variables.md") -> list[dict]:
+    doc, fuentes, bloques = cat.meta.get("documentacion", {}), cat.meta["fuentes"], cat.meta["bloques"]
+    filas = []
+    for v in cat.variables:
+        origen = " + ".join(f"{f.strip()} ({fuentes[f.strip()]})" for f in str(v["fuente"]).split("+"))
+        filas.append({
+            "VARIABLE": v["nombre"], "EMPRESA": doc.get("empresa", ""), "UNIDAD NEGOCIO": doc.get("unidad_negocio", ""),
+            "OPERACION": f"{v['operacion']} - {cat.meta['operaciones'][v['operacion']]}",
+            "DESCRIPCION": v["descripcion"], "VENTANA TIEMPO": v["ventana_meses"], "ORIGEN": origen,
+            "DEFINICION": " ".join(str(v["definicion"]).split()), "AGRUPADOR": doc.get("agrupador", "CUIT"),
+            "UNIDAD TIEMPO": "MES", "ACTUALIZACION": str(v.get("actualizacion", "mensual")).upper(),
+            "REFERENTE": doc.get("referente", ""), "TIPO DATO": _TIPO[v["tipo_dato"]], "CLASE": _CLASE[v["tipo_dato"]],
+            "NULOS": v["nulos"], "LINK": f"{link_doc}#{v['bloque'].lower()}",
+            "OBSERVACIONES": " ".join(str(v.get("observaciones", "")).split()),
+            "BLOQUE": v["bloque"], "USO": v["uso"], "SENTIDO ESPERADO": v.get("sentido", ""),
+            "UNIDAD": v.get("unidad", ""), "DISPONIBLE DESDE": v.get("disponible_desde", ""), "SQL": v["sql"],
+        })
+    return filas
+
+
+def escribir_diccionario(cat: Catalogo, dst: str | Path) -> Path:
+    """CSV en UTF-8 con BOM (abre bien en Excel)."""
+    import csv
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    with dst.open("w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=COLUMNAS_DICCIONARIO)
+        w.writeheader()
+        w.writerows(filas_diccionario(cat))
+    return dst
+
+
+_INTRO = """# Variables CENDEU v2 — documento técnico
+
+> Generado desde [`catalogo/variables.yaml`](../catalogo/variables.yaml) con `cendeu documentar`. No editar a mano:
+> los cambios van al catálogo. Diccionario en formato plantilla: [`diccionario_variables.csv`](diccionario_variables.csv).
+
+Variables de comportamiento crediticio por CUIT construidas sobre la Central de Deudores del BCRA, con el enfoque del
+Feature Store CRC: diseñadas por dominio de riesgo, con dinámica temporal (VAR, TEN, FMX, RSI) y documentadas antes
+de medir su poder. Contexto y decisiones: [PLAN.md](../PLAN.md), [estudio del 24DSF](../reportes/estudio_24dsf.md),
+[fuentes BCRA y ARCA](../reportes/fuentes_bcra_arca.md).
+
+## Nomenclatura
+
+`CEN_<OPERACION>_<DESCRIPCION>_<VENTANA>`. `VENTANA` = `<n>M`, los últimos *n* meses terminando en la fecha de
+observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deuda actual sobre la de hace 6 meses.
+
+## Cómo se construyen
+
+1. **Base limpia** (`cendeu base`): una fila por CUIT × entidad × mes.
+   - Período de corte desde el `deudores.txt` mensual y los 23 anteriores desde el 24DSF (el 24DSF omite entidades en su primer mes).
+   - Sólo `tipo_id` 11; situación 11 → 1; duplicados CUIT × entidad × mes: peor situación y suma de montos.
+   - Entidades absorbidas o recodificadas reemplazadas por su destino en toda la historia
+     ([`referencias/entidades_equivalencias.csv`](../referencias/entidades_equivalencias.csv)).
+   - CUITs dados de baja reemplazados por su CUIT de reemplazo (padrón ARCA).
+   - Montos en miles de pesos constantes del mes base, deflactados con [`referencias/ipc.csv`](../referencias/ipc.csv)
+     (IPC INDEC). Cada base guarda en `_meta.json` el hash del IPC usado y si había meses imputados.
+2. **Series densas** (`cendeu variables-v2`): para la fecha de observación *t* se arman 13 meses (t-12..t) por CUIT,
+   con ausencia = deuda 0, situación 0, 0 entidades. El mes t-12 sólo sirve como mes previo para altas y transiciones.
+   Así las diferencias y el RSI nunca saltan meses (problema del Feature Store CRC).
+3. **Variables**: cada una es una expresión SQL del catálogo sobre esas series. No hay SQL de variables escrito a mano.
+
+## Población y target
+
+"""
+
+
+def escribir_documento(cat: Catalogo, dst: str | Path) -> Path:
+    m, out = cat.meta, [_INTRO]
+    for t in m["targets"]:
+        out += [f"- **`{t['nombre']}`**: {t['descripcion']}. Definición: `{t['definicion']}`.",
+                f"- **Población**: {' '.join(t['poblacion'].split())}",
+                f"- {' '.join(t['observaciones'].split())}", ""]
+    out += ["## Convenciones", ""] + [f"- **{k}**: {' '.join(str(v).split())}" for k, v in m["convenciones"].items()]
+    out += ["", "## Fuentes", "", "| Código | Fuente |", "|---|---|"] + [f"| `{k}` | {v} |" for k, v in m["fuentes"].items()]
+    out += ["", "## Series mensuales base", "", "| Serie | Contenido |", "|---|---|"] + \
+           [f"| `{k}` | {v} |" for k, v in m["series"].items()]
+    out += ["", "## Operaciones", "", "| Código | Significado |", "|---|---|"] + \
+           [f"| `{k}` | {v} |" for k, v in m["operaciones"].items()]
+    usos = {}
+    for v in cat.variables:
+        usos.setdefault(v["bloque"], {}).setdefault(v["uso"], 0)
+        usos[v["bloque"]][v["uso"]] += 1
+    out += ["", "## Resumen", "", f"{len(cat.variables)} variables.", "", "| Bloque | Qué mide | Variables | Uso |", "|---|---|---|---|"]
+    for b, d in m["bloques"].items():
+        u = ", ".join(f"{k}: {n}" for k, n in sorted(usos.get(b, {}).items()))
+        out.append(f"| [{b}](#{b.lower()}) | {d} | {sum(usos.get(b, {}).values())} | {u} |")
+    out += ["", "`uso`: **modelo** = candidata al score; **futuro** = sólo existe desde 202609 (mensual), entra cuando haya "
+            "historia acumulada; **monitoreo** = no entra al score, sirve para medir sesgos; **exclusion** = define la población.",
+            "", "Sentido esperado: relación hipotética con el riesgo (`+` = más valor, más riesgo). Se contrasta en el informe de poder."]
+    for b, d in m["bloques"].items():
+        out += ["", f'<a id="{b.lower()}"></a>', f"## {b} — {d}", "",
+                "| Variable | Descripción | Definición | Nulos | Sentido | Uso |", "|---|---|---|---|---|---|"]
+        for v in (x for x in cat.variables if x["bloque"] == b):
+            defi = " ".join(str(v["definicion"]).split()).replace("|", "\\|")
+            out.append(f"| `{v['nombre']}` | {v['descripcion']} | {defi} | {v['nulos']} | {v.get('sentido', '')} | {v['uso']} |")
+        obs = [(v["nombre"], " ".join(str(v["observaciones"]).split())) for v in cat.variables
+               if v["bloque"] == b and v.get("observaciones")]
+        if obs:
+            out += ["", "Notas:"] + [f"- `{n}`: {o}" for n, o in obs]
+    out += ["", "## Cómo agregar o cambiar una variable", "",
+            "1. Editar `catalogo/variables.yaml` (o agregar un valor a `expandir` de una familia existente).",
+            "2. `cendeu catalogo` valida nombre, operación, bloque, fuente, tipo y uso.",
+            "3. Agregar el caso a `tests/test_v2.py` si la lógica es nueva.",
+            "4. `cendeu documentar` regenera este documento y el diccionario.", ""]
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text("\n".join(out), encoding="utf-8")
+    return dst
+
+
 if __name__ == "__main__":
     import sys
 

@@ -13,6 +13,9 @@ Flujo:
 """
 from __future__ import annotations
 
+import datetime as dt
+import hashlib
+import json
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -55,6 +58,14 @@ CREATE OR REPLACE MACRO tipo_persona(c) AS
 
 TIPOS = ["BANCO", "CIA_FIN", "TARJETA_NB", "PNFC", "FIDEICOMISO"]
 BANCARIOS = "('BANCO', 'CIA_FIN')"
+
+
+def _hash(path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
+
+
+def _escribir_meta(dst: Path, meta: dict) -> None:
+    (dst / "_meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
 
 def _q(path) -> str:
@@ -144,6 +155,17 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
 
     if not extras:
         return dst
+    with con_base() as con:
+        imputados = [r[0] for r in con.execute(
+            f"SELECT periodo FROM read_csv('{_q(ipc_csv)}', header = true) WHERE imputado = 1 AND periodo <= {max(periodos)}").fetchall()]
+    _escribir_meta(dst, dict(
+        fecha=dt.datetime.now().isoformat(timespec="seconds"), periodos=[min(periodos), max(periodos)],
+        periodos_mensual=periodos_men, base_ipc=base, ipc_base=ipc_base, ipc_imputados=imputados,
+        archivos={"ipc": _hash(ipc_csv), "entidades": _hash(ref / "entidades.csv"),
+                  "equivalencias": _hash(ref / "entidades_equivalencias.csv")},
+        padron=str(padron) if padron else None, uno_dsf=str(uno_dsf) if uno_dsf else None, n_buckets=n_buckets))
+    if imputados:
+        print(f"ATENCIÓN: IPC imputado en {imputados}; rehacer la base cuando el INDEC lo publique", flush=True)
     with con_base() as con:
         # Persona: padrón + 1DSF para los CUITs de la central
         con.execute(f"""CREATE TABLE cuits AS SELECT DISTINCT cuit FROM read_parquet('{_q(dst / "deudores")}/*/*/*.parquet')""")

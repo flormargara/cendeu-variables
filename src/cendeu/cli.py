@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("base", help="v2: base limpia (24DSF + mensual, equivalencias, IPC) por período y bucket")
     p.add_argument("dir_24dsf"); p.add_argument("salida")
-    p.add_argument("--ipc", required=True); p.add_argument("--referencias", default="referencias")
+    p.add_argument("--ipc", default="referencias/ipc.csv"); p.add_argument("--referencias", default="referencias")
     p.add_argument("--mensual"); p.add_argument("--padron"); p.add_argument("--uno-dsf")
     p.add_argument("--base-ipc", type=int, help="período de los pesos constantes (default: último del IPC)")
     p.add_argument("--desde", type=int, help="retomar desde este período (los anteriores ya están escritos)")
@@ -50,6 +50,9 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("catalogo", help="v2: valida el catálogo y muestra el conteo por bloque")
     p.add_argument("--catalogo", default="catalogo/variables.yaml")
+
+    p = sub.add_parser("documentar", help="v2: genera docs/variables.md y docs/diccionario_variables.csv desde el catálogo")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml"); p.add_argument("--docs", default="docs")
 
     p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
     p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
@@ -77,6 +80,14 @@ def main(argv: list[str] | None = None) -> None:
     elif a.cmd == "variables-v2":
         for obs in a.obs:
             v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, **kw)
+    elif a.cmd == "documentar":
+        from pathlib import Path
+        from . import catalogo
+        c = catalogo.cargar(a.catalogo)
+        if c.errores:
+            raise SystemExit("\n".join(c.errores))
+        print(catalogo.escribir_diccionario(c, Path(a.docs) / "diccionario_variables.csv"))
+        print(catalogo.escribir_documento(c, Path(a.docs) / "variables.md"))
     elif a.cmd == "subir":
         filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
         malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]

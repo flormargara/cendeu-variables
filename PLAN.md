@@ -9,6 +9,7 @@ Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA,
 | Nomenclatura | Unificada: `CEN_<OPERACION>_<DESCRIPCION>_<VENTANA>`. No se mantienen los nombres v1. |
 | Ventanas | 3, 6 y 12 meses. |
 | Target | Situación ≥3 en los **6 meses** siguientes (permite varias fechas de observación, validación *out-of-time* y PSI). Target a 12 meses queda para iteraciones futuras. |
+| IPC | INDEC vía datos.gob.ar, versionado en [`referencias/ipc.csv`](referencias/ipc.csv) y copiado por corte a S3; cada base registra su hash y meses imputados en `_meta.json`. |
 | Almacenamiento | `s3://data-cendeu-raw` (perfil `fmargara`, política [`infra/cendeu-s3-policy.json`](infra/cendeu-s3-policy.json)), una carpeta por período. |
 | v1 | Variables y scores v1 se suben sólo como línea de base; se borran cuando exista v2 (*fresh start*). |
 | Repo | Se mantiene el repo actual; el rediseño se hace sobre él. |
@@ -27,6 +28,8 @@ s3://data-cendeu-raw/
   padron/corte=AAAAMMDD/…                     padrón ARCA y nomenclador de actividades
   docs/                                       diccionario e informes
   _control/ingestas.csv                       registro por período del bianual: corte de origen, filas, CUITs, entidades, monto, estado
+  referencias/ipc|entidades/corte=AAAAMM/      IPC y tablas de entidades usadas en cada corte
+  _control/bases.csv                          una fila por base v2 construida (IPC, imputados, hashes)
   _control/fuentes.csv                        registro de las demás fuentes: archivo de origen, filas, bytes, ruta
 ```
 
@@ -41,7 +44,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (subidas a S3, registro en `_control/fuentes.csv`) |
 | 2 | Catálogo de variables por bloques | [`catalogo/variables.yaml`](catalogo/variables.yaml) (149 variables, validado por `cendeu.catalogo` y test) | hecho, a revisar |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | [`src/cendeu/v2.py`](src/cendeu/v2.py), [`src/cendeu/s3.py`](src/cendeu/s3.py), [`tests/test_v2.py`](tests/test_v2.py) | en curso |
-| 4 | Documentación de variables (diccionario + documento técnico) | `docs/diccionario_variables.csv`, `docs/variables.md` | pendiente |
+| 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho (falta completar empresa, unidad de negocio y referente en el catálogo) |
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | `docs/variables_mix.md` | pendiente |
 | 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | informe HTML | pendiente |
 | 6 | Selección y nuevo scorecard | `modelos/` | pendiente |

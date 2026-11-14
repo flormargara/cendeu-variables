@@ -155,3 +155,17 @@ def test_catalogo_v2_valido():
     assert all(n.startswith("CEN_") for n in nombres)
     assert len(nombres) == len(set(nombres))
     assert max(v["ventana_meses"] for v in cat.variables) <= 12
+
+
+def test_documentacion_v2(tmp_path):
+    import csv
+    from pathlib import Path
+
+    from cendeu.catalogo import COLUMNAS_DICCIONARIO, cargar, escribir_diccionario, escribir_documento
+
+    cat = cargar(Path(__file__).parents[1] / "catalogo" / "variables.yaml")
+    with escribir_diccionario(cat, tmp_path / "d.csv").open(encoding="utf-8-sig") as f:
+        filas = list(csv.DictReader(f))
+    assert list(filas[0]) == COLUMNAS_DICCIONARIO and len(filas) == len(cat.variables)
+    doc = escribir_documento(cat, tmp_path / "v.md").read_text(encoding="utf-8")
+    assert all(f"`{v['nombre']}`" in doc for v in cat.variables)
