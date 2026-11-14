@@ -112,8 +112,8 @@ def validar(cat: Catalogo) -> list[str]:
 
 
 COLUMNAS_DICCIONARIO = [
-    "VARIABLE", "EMPRESA", "UNIDAD NEGOCIO", "OPERACION", "DESCRIPCION", "VENTANA TIEMPO", "ORIGEN", "DEFINICION",
-    "AGRUPADOR", "UNIDAD TIEMPO", "ACTUALIZACION", "REFERENTE", "TIPO DATO", "CLASE", "NULOS", "LINK", "OBSERVACIONES",
+    "VARIABLE", "OPERACION", "DESCRIPCION", "VENTANA TIEMPO", "ORIGEN", "DEFINICION",
+    "AGRUPADOR", "UNIDAD TIEMPO", "ACTUALIZACION", "TIPO DATO", "CLASE", "NULOS", "LINK", "OBSERVACIONES",
     # agregadas respecto de la plantilla CRC
     "BLOQUE", "USO", "SENTIDO ESPERADO", "UNIDAD", "DISPONIBLE DESDE", "SQL",
 ]
@@ -127,12 +127,12 @@ def filas_diccionario(cat: Catalogo, link_doc: str = "docs/variables.md") -> lis
     for v in cat.variables:
         origen = " + ".join(f"{f.strip()} ({fuentes[f.strip()]})" for f in str(v["fuente"]).split("+"))
         filas.append({
-            "VARIABLE": v["nombre"], "EMPRESA": doc.get("empresa", ""), "UNIDAD NEGOCIO": doc.get("unidad_negocio", ""),
+            "VARIABLE": v["nombre"],
             "OPERACION": f"{v['operacion']} - {cat.meta['operaciones'][v['operacion']]}",
             "DESCRIPCION": v["descripcion"], "VENTANA TIEMPO": v["ventana_meses"], "ORIGEN": origen,
             "DEFINICION": " ".join(str(v["definicion"]).split()), "AGRUPADOR": doc.get("agrupador", "CUIT"),
             "UNIDAD TIEMPO": "MES", "ACTUALIZACION": str(v.get("actualizacion", "mensual")).upper(),
-            "REFERENTE": doc.get("referente", ""), "TIPO DATO": _TIPO[v["tipo_dato"]], "CLASE": _CLASE[v["tipo_dato"]],
+            "TIPO DATO": _TIPO[v["tipo_dato"]], "CLASE": _CLASE[v["tipo_dato"]],
             "NULOS": v["nulos"], "LINK": f"{link_doc}#{v['bloque'].lower()}",
             "OBSERVACIONES": " ".join(str(v.get("observaciones", "")).split()),
             "BLOQUE": v["bloque"], "USO": v["uso"], "SENTIDO ESPERADO": v.get("sentido", ""),

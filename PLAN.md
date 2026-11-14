@@ -44,7 +44,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (subidas a S3, registro en `_control/fuentes.csv`) |
 | 2 | Catálogo de variables por bloques | [`catalogo/variables.yaml`](catalogo/variables.yaml) (149 variables, validado por `cendeu.catalogo` y test) | hecho, a revisar |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | [`src/cendeu/v2.py`](src/cendeu/v2.py), [`src/cendeu/s3.py`](src/cendeu/s3.py), [`tests/test_v2.py`](tests/test_v2.py) | en curso |
-| 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho (falta completar empresa, unidad de negocio y referente en el catálogo) |
+| 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho |
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | `docs/variables_mix.md` | pendiente |
 | 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | informe HTML | pendiente |
 | 6 | Selección y nuevo scorecard | `modelos/` | pendiente |

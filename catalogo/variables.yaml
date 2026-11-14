@@ -107,11 +107,8 @@ tipo:
   PNFC: proveedores no financieros de crédito
   FIDEICOMISO: fideicomisos financieros
 
-# Campos fijos del diccionario (plantilla del Feature Store CRC). Completar empresa, unidad y referente.
+# Campos fijos del diccionario (plantilla del Feature Store CRC)
 documentacion:
-  empresa: ""
-  unidad_negocio: ""
-  referente: ""
   agrupador: CUIT
 
 defaults:
