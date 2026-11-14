@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-CAMPOS_REQUERIDOS = ("nombre", "bloque", "descripcion", "definicion", "fuente", "tipo_dato", "nulos", "uso")
+CAMPOS_REQUERIDOS = ("nombre", "bloque", "descripcion", "definicion", "fuente", "tipo_dato", "nulos", "uso", "sql")
 TIPOS_DATO = {"DECIMAL", "INTEGER", "FLAG", "CATEGORICA"}
 USOS = {"modelo", "futuro", "monitoreo", "exclusion"}
 PATRON_NOMBRE = re.compile(r"^CEN_(?P<op>[A-Z]+)_(?P<desc>[A-Z0-9]+(?:_[A-Z0-9]+)*?)_(?P<ventana>\d+)M$")
@@ -57,6 +57,8 @@ def _expandir(entrada: dict, meta: dict) -> list[dict]:
             dicc = meta.get(k) if isinstance(meta.get(k), dict) else meta.get(k + "s")
             if isinstance(dicc, dict):  # serie → series, tipo → tipo: habilita {serie_desc}
                 ctx[f"{k}_desc"] = dicc.get(val, val)
+            if isinstance(meta.get(f"{k}_sql"), dict):  # op → op_sql: habilita {op_sql}
+                ctx[f"{k}_sql"] = meta[f"{k}_sql"][val]
         salida.append({k: _formatear(v, ctx) for k, v in base.items()})
     return salida
 
@@ -103,7 +105,7 @@ def validar(cat: Catalogo) -> list[str]:
             errores.append(f"{n}: tipo_dato {v.get('tipo_dato')} inválido")
         if v.get("uso") not in USOS:
             errores.append(f"{n}: uso {v.get('uso')} inválido")
-        for c in ("nombre", "descripcion"):
+        for c in ("nombre", "descripcion", "sql"):
             if re.search(r"\{[a-z_]+\}", str(v.get(c, ""))):
                 errores.append(f"{n}: plantilla sin resolver en {c}")
     return errores

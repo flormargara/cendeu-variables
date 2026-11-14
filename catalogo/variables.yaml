@@ -91,10 +91,13 @@ series:
   HHI: Concentración de la deuda entre entidades, suma de participaciones al cuadrado
   ENT_PRINC: Entidad con mayor deuda (desempate por menor código)
 
-# Nombre de las operaciones en las descripciones expandidas ({op_desc})
+# Nombre de las operaciones en las descripciones expandidas ({op_desc}) y su función de lista ({op_sql})
 op:
   AVG: Promedio
   MAX: Máximo
+op_sql:
+  AVG: list_avg
+  MAX: list_max
 
 # tipo_agrupado de referencias/entidades.csv
 tipo:
@@ -127,6 +130,7 @@ variables:
 
   # ------------------------------------------------------------------ B01 MAGNITUD
   - nombre: CEN_MTO_{serie}_1M
+    sql: "ult(s.{serie})"
     expandir: {serie: [DEUDA, DEUDA_IRR, DEUDA_MORA]}
     bloque: B01_MAGNITUD
     descripcion: "{serie_desc} en el mes de observación"
@@ -136,6 +140,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_{op}_DEUDA_{v}M
+    sql: "{op_sql}(ven(s.DEUDA, {v}))"
     expandir: {op: [AVG, MAX], v: [3, 6, 12]}
     bloque: B01_MAGNITUD
     descripcion: "{op_desc} de la deuda total en los últimos {v} meses"
@@ -145,6 +150,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_{op}_DEUDA_IRR_{v}M
+    sql: "{op_sql}(ven(s.DEUDA_IRR, {v}))"
     expandir: {op: [AVG, MAX], v: [3, 6, 12]}
     bloque: B01_MAGNITUD
     descripcion: "{op_desc} de la deuda en situación 2 o peor en los últimos {v} meses"
@@ -154,6 +160,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_PCT_DEUDA_IRR_1M
+    sql: "ult(s.PCT_IRR)"
     bloque: B01_MAGNITUD
     descripcion: Proporción de la deuda actual en situación 2 o peor
     definicion: DEUDA_IRR_t / DEUDA_t
@@ -162,6 +169,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_AVG_PCT_DEUDA_IRR_{v}M
+    sql: "list_avg(ven(s.PCT_IRR, {v}))"
     expandir: {v: [3, 6, 12]}
     bloque: B01_MAGNITUD
     descripcion: "Promedio de la proporción de deuda irregular en los últimos {v} meses"
@@ -172,6 +180,7 @@ variables:
 
   # ------------------------------------------------------------------ B02 CALIDAD
   - nombre: CEN_MAX_SIT_{v}M
+    sql: "list_max(ven(s.SIT, {v}))"
     expandir: {v: [1, 3, 6, 12]}
     bloque: B02_CALIDAD
     descripcion: "Peor situación en los últimos {v} meses"
@@ -182,6 +191,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_AVG_SIT_POND_{v}M
+    sql: "list_avg(ven(s.SIT_POND, {v}))"
     expandir: {v: [1, 3, 6, 12]}
     bloque: B02_CALIDAD
     descripcion: "Situación ponderada por monto, promedio de los últimos {v} meses"
@@ -191,6 +201,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_MESES_SIT2P_{v}M
+    sql: "len(list_filter(ven(s.SIT, {v}), lambda z: z >= 2))"
     expandir: {v: [3, 6, 12]}
     bloque: B02_CALIDAD
     descripcion: "Meses con situación 2 o peor en los últimos {v} meses"
@@ -201,6 +212,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_MESES_SIT3P_{v}M
+    sql: "len(list_filter(ven(s.SIT, {v}), lambda z: z >= 3))"
     expandir: {v: [6, 12]}
     bloque: B02_CALIDAD
     descripcion: "Meses con situación 3 o peor en los últimos {v} meses"
@@ -212,6 +224,7 @@ variables:
     observaciones: La población del target excluye SIT_t >= 3, pero puede haberla tenido antes.
 
   - nombre: CEN_MOD_SIT_12M
+    sql: "moda_peor(ven(s.SIT, 12))"
     bloque: B02_CALIDAD
     descripcion: Situación más frecuente en los últimos 12 meses (incluye 0 = ausente)
     definicion: MODE(SIT) sobre t-11..t; desempate por la peor
@@ -221,6 +234,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_RCM_SIT2P_12M
+    sql: "rcm(list_transform(ven(s.SIT, 12), lambda z: z >= 2))"
     bloque: B02_CALIDAD
     descripcion: Meses desde la última vez en situación 2 o peor
     definicion: t - último mes con SIT >= 2 en t-11..t
@@ -230,6 +244,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RCM_SIT3P_12M
+    sql: "rcm(list_transform(ven(s.SIT, 12), lambda z: z >= 3))"
     bloque: B02_CALIDAD
     descripcion: Meses desde la última vez en situación 3 o peor
     definicion: t - último mes con SIT >= 3 en t-11..t
@@ -239,6 +254,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RCM_PEOR_SIT_12M
+    sql: "rcm(list_transform(ven(s.SIT, 12), lambda z: z = list_max(ven(s.SIT, 12))))"
     bloque: B02_CALIDAD
     descripcion: Meses desde el peor momento (máxima situación) de los últimos 12 meses
     definicion: t - último mes con SIT = MAX(SIT) en t-11..t
@@ -248,6 +264,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_FLG_PEOR_MOMENTO_1M
+    sql: "(ult(s.SIT) = list_max(ven(s.SIT, 12)) AND ult(s.SIT) >= 2)::INT"
     bloque: B02_CALIDAD
     descripcion: El mes de observación es el peor de los últimos 12 meses y la situación es 2 o peor
     definicion: SIT_t = MAX(SIT en t-11..t) AND SIT_t >= 2
@@ -256,6 +273,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_ENT_SIT2P_1M
+    sql: "ult(s.ENT_IRR)"
     bloque: B02_CALIDAD
     descripcion: Entidades en las que tiene situación 2 o peor en el mes
     definicion: ENT_IRR_t
@@ -265,6 +283,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_ENT_SIT3P_12M
+    sql: "x.ENT_SIT3P_12"
     bloque: B02_CALIDAD
     descripcion: Entidades distintas en las que tuvo situación 3 o peor en los últimos 12 meses
     definicion: COUNT DISTINCT entidad con situación >= 3 en t-11..t
@@ -274,6 +293,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_PROC_JUDICIAL_12M
+    sql: "x.PJ_12"
     bloque: B02_CALIDAD
     descripcion: Alguna deuda informada en proceso judicial o revisión (Ley 25.326) en los últimos 12 meses
     definicion: MAX(flag IN (1, 2)) en t-11..t
@@ -284,6 +304,7 @@ variables:
 
   # ------------------------------------------------------------------ B03 TRANSICIONES
   - nombre: CEN_CNT_EMPEORA_{v}M
+    sql: "len(list_filter(pares(s.SIT, 15 - {v}), lambda p: p.a >= 1 AND p.b > p.a))"
     expandir: {v: [6, 12]}
     bloque: B03_TRANSICIONES
     descripcion: "Meses en que empeoró la situación respecto del mes anterior, últimos {v} meses"
@@ -295,6 +316,7 @@ variables:
     observaciones: No cuenta las altas (0 -> k).
 
   - nombre: CEN_CNT_MEJORA_{v}M
+    sql: "len(list_filter(pares(s.SIT, 15 - {v}), lambda p: p.b < p.a AND p.b >= 1))"
     expandir: {v: [6, 12]}
     bloque: B03_TRANSICIONES
     descripcion: "Meses en que mejoró la situación respecto del mes anterior, últimos {v} meses"
@@ -305,6 +327,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RAT_CURA_12M
+    sql: "len(list_filter(pares(s.SIT, 2), lambda p: p.a >= 2 AND p.b = 1)) / nullif(len(list_filter(pares(s.SIT, 2), lambda p: p.a >= 2)), 0)"
     bloque: B03_TRANSICIONES
     descripcion: Tasa de cura individual, salidas de situación 2+ a situación 1 sobre meses en situación 2+
     definicion: COUNT(SIT_{m-1} >= 2 AND SIT_m = 1) / COUNT(SIT_{m-1} >= 2) en t-11..t
@@ -313,6 +336,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RAT_ROLL_2A3_12M
+    sql: "len(list_filter(pares(s.SIT, 2), lambda p: p.a = 2 AND p.b >= 3)) / nullif(len(list_filter(pares(s.SIT, 2), lambda p: p.a = 2)), 0)"
     bloque: B03_TRANSICIONES
     descripcion: Tasa de roll individual de situación 2 a 3 o peor
     definicion: COUNT(SIT_{m-1} = 2 AND SIT_m >= 3) / COUNT(SIT_{m-1} = 2) en t-11..t
@@ -322,6 +346,7 @@ variables:
     observaciones: Roll de 2 a 3 del sistema = 34% mensual (estudio, sección 4).
 
   - nombre: CEN_MAX_RACHA_SIT2P_12M
+    sql: "max_racha(bits(ven(s.SIT, 12), 2))"
     bloque: B03_TRANSICIONES
     descripcion: Racha más larga de meses consecutivos en situación 2 o peor
     definicion: máxima longitud de corrida SIT >= 2 en t-11..t
@@ -331,6 +356,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_RACHA_SIT2P_1M
+    sql: "length(regexp_extract(bits(ven(s.SIT, 12), 2), '1*$'))"
     bloque: B03_TRANSICIONES
     descripcion: Meses consecutivos en situación 2 o peor hasta el mes de observación
     definicion: longitud de la corrida SIT >= 2 que termina en t (0 si SIT_t < 2)
@@ -340,6 +366,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_RACHA_SIT1_1M
+    sql: "length(replace(regexp_extract(cod_sit(ven(s.SIT, 12)), '[01]*$'), '0', ''))"
     bloque: B03_TRANSICIONES
     descripcion: Meses consecutivos en situación 1 hasta el mes de observación (tope 12)
     definicion: longitud de la corrida SIT = 1 que termina en t, contando ausencias intermedias como neutras
@@ -350,6 +377,7 @@ variables:
     observaciones: Versión sin tope en CEN_CNT_MESES_SIT1_ININT_1M (bloque persona, desde 1DSF).
 
   - nombre: CEN_MAX_SALTO_SIT_12M
+    sql: "coalesce(list_max(list_transform(list_filter(pares(s.SIT, 2), lambda p: p.a >= 1), lambda p: greatest(p.b - p.a, 0))), 0)"
     bloque: B03_TRANSICIONES
     descripcion: Mayor empeoramiento de situación entre dos meses consecutivos
     definicion: MAX(SIT_m - SIT_{m-1}) con SIT_{m-1} >= 1, en t-11..t (0 si nunca empeoró)
@@ -359,6 +387,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_ENTRADA_SIT4P_12M
+    sql: "x.ENTRADA_SIT4_12"
     bloque: B03_TRANSICIONES
     descripcion: Alguna relación nueva con una entidad que aparece directamente en situación 4 o peor
     definicion: existe (entidad, m) en t-11..t con situación >= 4 y sin presencia de esa entidad en m-1
@@ -368,6 +397,7 @@ variables:
     observaciones: Proxy de cartera cedida o comprada (estudio, hallazgo 6; fideicomisos de recupero).
 
   - nombre: CEN_CNT_ENT_EMPEORA_3M
+    sql: "x.ENT_EMPEORA_3"
     bloque: B03_TRANSICIONES
     descripcion: Entidades en las que la situación actual es peor que hace 3 meses
     definicion: COUNT entidades con situación_t > situación_{t-2} (presentes en ambos meses)
@@ -378,6 +408,7 @@ variables:
 
   # ------------------------------------------------------------------ B04 VELOCIDAD
   - nombre: CEN_VAR_DEUDA_1M
+    sql: "(s.DEUDA[13] - s.DEUDA[12]) / nullif(s.DEUDA[12], 0)"
     bloque: B04_VELOCIDAD
     descripcion: Variación relativa de la deuda total respecto del mes anterior
     definicion: (DEUDA_t - DEUDA_{t-1}) / DEUDA_{t-1}
@@ -386,6 +417,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_AVG_VAR_DEUDA_{v}M
+    sql: "list_avg(list_transform(pares(s.DEUDA, 15 - {v}), lambda p: (p.b - p.a) / nullif(p.a, 0)))"
     expandir: {v: [6, 12]}
     bloque: B04_VELOCIDAD
     descripcion: "Promedio de las variaciones mensuales de la deuda en los últimos {v} meses"
@@ -395,6 +427,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_TEN_{serie}_{v}M
+    sql: "ult(s.{serie}) / nullif(ini(s.{serie}, {v}), 0)"
     expandir: {serie: [DEUDA, DEUDA_IRR, ENT], v: [3, 6, 12]}
     bloque: B04_VELOCIDAD
     descripcion: "{serie_desc}: valor actual sobre el de hace {v} meses"
@@ -404,6 +437,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FMX_{serie}_{v}M
+    sql: "ult(s.{serie}) / nullif(list_sum(ven(s.{serie}, {v})), 0)"
     expandir: {serie: [DEUDA, ENT], v: [3, 6, 12]}
     bloque: B04_VELOCIDAD
     descripcion: "{serie_desc}: peso del mes actual en el total de los últimos {v} meses"
@@ -413,6 +447,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_DIF_SIT_{v}M
+    sql: "ult(s.SIT) - ini(s.SIT, {v})"
     expandir: {v: [3, 6, 12]}
     bloque: B04_VELOCIDAD
     descripcion: "Cambio de la peor situación respecto de hace {v} meses"
@@ -423,6 +458,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CV_DEUDA_{v}M
+    sql: "list_aggregate(ven(s.DEUDA, {v}), 'stddev_pop') / nullif(list_avg(ven(s.DEUDA, {v})), 0)"
     expandir: {v: [6, 12]}
     bloque: B04_VELOCIDAD
     descripcion: "Coeficiente de variación de la deuda en los últimos {v} meses"
@@ -432,6 +468,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_PND_DEUDA_{v}M
+    sql: "pnd(s.DEUDA, {v})"
     expandir: {v: [6, 12]}
     bloque: B04_VELOCIDAD
     descripcion: "Pendiente relativa de la deuda en los últimos {v} meses (crecimiento mensual promedio)"
@@ -442,6 +479,7 @@ variables:
 
   # ------------------------------------------------------------------ B05 MOMENTUM
   - nombre: CEN_RSI_{serie}_{v}M
+    sql: "rsi(s.{serie}, {v})"
     expandir: {serie: [DEUDA, DEUDA_IRR, ENT, SIT], v: [3, 6, 12]}
     bloque: B05_MOMENTUM
     descripcion: "{serie_desc}: RSI de los últimos {v} meses"
@@ -453,6 +491,7 @@ variables:
 
   # ------------------------------------------------------------------ B06 RELACIÓN CON EL SISTEMA
   - nombre: CEN_CNT_ENT_1M
+    sql: "ult(s.ENT)"
     bloque: B06_RELACION_SISTEMA
     descripcion: Entidades con las que tiene deuda en el mes
     definicion: ENT_t
@@ -462,6 +501,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_{op}_ENT_{v}M
+    sql: "{op_sql}(ven(s.ENT, {v}))"
     expandir: {op: [AVG, MAX], v: [6, 12]}
     bloque: B06_RELACION_SISTEMA
     descripcion: "{op_desc} de la cantidad de entidades en los últimos {v} meses"
@@ -471,6 +511,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_ENT_DISTINTAS_12M
+    sql: "x.ENT_DIST_12"
     bloque: B06_RELACION_SISTEMA
     descripcion: Entidades distintas con las que tuvo deuda en los últimos 12 meses
     definicion: COUNT DISTINCT entidad en t-11..t
@@ -480,6 +521,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_ALTAS_{v}M
+    sql: "list_sum(ven(s.ALTAS, {v}))"
     expandir: {v: [3, 6, 12]}
     bloque: B06_RELACION_SISTEMA
     descripcion: "Relaciones nuevas con entidades en los últimos {v} meses"
@@ -491,6 +533,7 @@ variables:
     observaciones: Requiere un mes previo a la ventana; con equivalencias aplicadas.
 
   - nombre: CEN_CNT_BAJAS_{v}M
+    sql: "list_sum(ven(s.BAJAS, {v}))"
     expandir: {v: [3, 6, 12]}
     bloque: B06_RELACION_SISTEMA
     descripcion: "Relaciones con entidades que se cerraron en los últimos {v} meses"
@@ -501,6 +544,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RCM_ULTIMA_ALTA_12M
+    sql: "rcm(list_transform(ven(s.ALTAS, 12), lambda z: z > 0))"
     bloque: B06_RELACION_SISTEMA
     descripcion: Meses desde la última relación nueva
     definicion: t - último mes con un alta en t-11..t
@@ -510,6 +554,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RAT_PRINCIPALIDAD_1M
+    sql: "x.DEUDA_PRINC_T / nullif(ult(s.DEUDA), 0)"
     bloque: B06_RELACION_SISTEMA
     descripcion: Peso de la entidad principal en la deuda total
     definicion: deuda en ENT_PRINC_t / DEUDA_t
@@ -518,6 +563,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_CNT_CAMBIO_PRINC_{v}M
+    sql: "len(list_filter(pares(s.ENT_PRINC, 15 - {v}), lambda p: p.a <> p.b))"
     expandir: {v: [6, 12]}
     bloque: B06_RELACION_SISTEMA
     descripcion: "Veces que cambió la entidad principal en los últimos {v} meses"
@@ -528,6 +574,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_IDX_HHI_1M
+    sql: "ult(s.HHI)"
     bloque: B06_RELACION_SISTEMA
     descripcion: Concentración de la deuda entre entidades (1 = una sola entidad)
     definicion: HHI_t = SUM((deuda_entidad / DEUDA_t)^2)
@@ -536,6 +583,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_CNT_MESES_PRESENTE_12M
+    sql: "list_sum(ven(s.PRES, 12))"
     bloque: B06_RELACION_SISTEMA
     descripcion: Meses con deuda informada en los últimos 12 meses
     definicion: COUNT(SIT >= 1) en t-11..t
@@ -545,6 +593,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_CNT_HUECOS_12M
+    sql: "length(trim(bits(ven(s.PRES, 12), 1), '0')) - length(replace(trim(bits(ven(s.PRES, 12), 1), '0'), '0', ''))"
     bloque: B06_RELACION_SISTEMA
     descripcion: Meses ausente entre la primera y la última aparición de los últimos 12 meses
     definicion: (último mes presente - primer mes presente + 1) - CNT_MESES_PRESENTE en t-11..t
@@ -555,6 +604,7 @@ variables:
     observaciones: El 21% de los CUITs tiene huecos (estudio, hallazgo 4).
 
   - nombre: CEN_RCM_PRIMERA_APARICION_12M
+    sql: "12 - list_position(list_transform(ven(s.PRES, 12), lambda z: z = 1), true)"
     bloque: B06_RELACION_SISTEMA
     descripcion: Antigüedad en la central dentro de la ventana, meses desde la primera aparición
     definicion: t - primer mes con SIT >= 1 en t-11..t
@@ -565,6 +615,7 @@ variables:
     observaciones: Truncada a 12 meses por la historia disponible; complementa CEN_CNT_MESES_SIT1_ININT_1M.
 
   - nombre: CEN_FLG_REACTIVACION_12M
+    sql: "regexp_matches(bits(s.PRES, 1), '10{3,}1')::INT"
     bloque: B06_RELACION_SISTEMA
     descripcion: Volvió a la central después de 3 o más meses ausente
     definicion: existe m en t-11..t con SIT_m >= 1 y SIT = 0 en m-3..m-1 y presencia antes de m-3
@@ -574,6 +625,7 @@ variables:
 
   # ------------------------------------------------------------------ B07 MIX POR TIPO DE ENTIDAD
   - nombre: CEN_PCT_DEUDA_{tipo}_1M
+    sql: "x.DEUDA_{tipo}_T / nullif(ult(s.DEUDA), 0)"
     expandir: {tipo: [BANCO, CIA_FIN, TARJETA_NB, PNFC, FIDEICOMISO]}
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
@@ -584,6 +636,7 @@ variables:
     sentido: "según tipo: bancos -, PNFC y fideicomisos +"
 
   - nombre: CEN_CNT_ENT_{tipo}_1M
+    sql: "x.ENT_{tipo}_T"
     expandir: {tipo: [BANCO, TARJETA_NB, PNFC]}
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
@@ -595,6 +648,7 @@ variables:
     sentido: "según tipo"
 
   - nombre: CEN_CNT_TIPOS_ENT_1M
+    sql: "x.TIPOS_T"
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
     descripcion: Cantidad de tipos de entidad distintos con los que tiene deuda
@@ -605,6 +659,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_IDX_ENTROPIA_TIPO_{v}M
+    sql: "list_avg(ven(s.ENTROPIA, {v}))"
     expandir: {v: [1, 6]}
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
@@ -615,6 +670,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_SOLO_NO_BANCARIA_1M
+    sql: "(ult(s.DEUDA) > 0 AND x.DEUDA_BANCO_T + x.DEUDA_CIA_FIN_T = 0)::INT"
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
     descripcion: Toda su deuda es con entidades no bancarias (ni bancos ni compañías financieras)
@@ -624,6 +680,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_MAX_SIT_{grupo}_12M
+    sql: "x.MAXSIT_{grupo}_12"
     expandir: {grupo: [BANCARIA, NO_BANCARIA]}
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
@@ -635,6 +692,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_TEN_DEUDA_PNFC_6M
+    sql: "ult(s.DEUDA_PNFC) / nullif(ini(s.DEUDA_PNFC, 6), 0)"
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
     descripcion: Deuda con proveedores no financieros, actual sobre la de hace 6 meses
@@ -644,6 +702,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_FIDEICOMISO_RECUPERO_12M
+    sql: "x.RECUPERO_12"
     bloque: B07_MIX_ENTIDADES
     fuente: 24DSF + MAEENT
     descripcion: Tuvo deuda con un fideicomiso de recupero de cartera en los últimos 12 meses
@@ -657,6 +716,7 @@ variables:
   # Sólo existen desde 202609: no entran al modelo hasta acumular mensuales que cubran
   # las fechas de observación. Se calculan y se monitorean desde ya.
   - nombre: CEN_MAX_DIAS_ATRASO_1M
+    sql: "mm.MAX_DIAS_ATRASO"
     bloque: B08_FOTO_MENSUAL
     fuente: MENSUAL
     disponible_desde: 202609
@@ -670,6 +730,7 @@ variables:
     observaciones: Lo informan 162 de 545 entidades, casi sólo para situación 2+.
 
   - nombre: CEN_CNT_ENT_{campo}_1M
+    sql: "mm.ENT_{campo}"
     expandir: {campo: [REFINANCIACION, RECATEG_OBLIG, SIT_JURIDICA, IRRECUP_DISP_TECNICA]}
     bloque: B08_FOTO_MENSUAL
     fuente: MENSUAL
@@ -684,6 +745,7 @@ variables:
     observaciones: Refinanciación, situación jurídica e irrecuperable sólo aplican a bancos y compañías financieras.
 
   - nombre: CEN_FLG_GARANTE_1M
+    sql: "mm.GARANTE"
     bloque: B08_FOTO_MENSUAL
     fuente: MENSUAL
     disponible_desde: 202609
@@ -696,6 +758,7 @@ variables:
     observaciones: Única aproximación a la codeudoría del CRC.
 
   - nombre: CEN_PCT_DEUDA_GTIA_PREF_1M
+    sql: "mm.PCT_GTIA_PREF"
     bloque: B08_FOTO_MENSUAL
     fuente: MENSUAL
     disponible_desde: 202609
@@ -708,6 +771,7 @@ variables:
 
   # ------------------------------------------------------------------ B09 PERSONA
   - nombre: CEN_VAL_EDAD_1M
+    sql: "per.EDAD"
     bloque: B09_PERSONA
     fuente: PADRON
     descripcion: Edad en años a la fecha de observación (personas humanas)
@@ -718,6 +782,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_VAL_ANTIG_EMPRESA_1M
+    sql: "per.ANTIG_EMPRESA"
     bloque: B09_PERSONA
     fuente: PADRON
     descripcion: Años desde el contrato social a la fecha de observación (personas jurídicas)
@@ -728,6 +793,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_CAT_TIPO_PERSONA_1M
+    sql: "tipo_persona(s.cuit)"
     bloque: B09_PERSONA
     fuente: 24DSF
     descripcion: Persona humana o jurídica según prefijo del CUIT
@@ -737,6 +803,7 @@ variables:
     sentido: "?"
 
   - nombre: CEN_FLG_ACTIVIDAD_ARCA_1M
+    sql: "per.ACTIVIDAD_FLG"
     bloque: B09_PERSONA
     fuente: PADRON
     descripcion: Tiene actividad registrada en ARCA (monotributo, autónomo, empleador)
@@ -747,6 +814,7 @@ variables:
     observaciones: Foto del padrón (20261030); para fechas de observación pasadas puede filtrar información futura. Medir PSI y poder por fecha.
 
   - nombre: CEN_CAT_SECTOR_ACTIVIDAD_1M
+    sql: "per.SECTOR"
     bloque: B09_PERSONA
     fuente: PADRON
     descripcion: Sector de la actividad principal registrada en ARCA
@@ -757,6 +825,7 @@ variables:
     observaciones: Misma salvedad de foto que CEN_FLG_ACTIVIDAD_ARCA_1M.
 
   - nombre: CEN_CAT_PROVINCIA_1M
+    sql: "per.PROVINCIA"
     bloque: B09_PERSONA
     fuente: PADRON
     descripcion: Provincia del domicilio fiscal
@@ -766,6 +835,7 @@ variables:
     sentido: "?"
 
   - nombre: CEN_CNT_MESES_SIT1_ININT_1M
+    sql: "x.MESES_SIT1_ININT"
     bloque: B09_PERSONA
     fuente: 1DSF + 24DSF
     descripcion: Meses en situación 1 ininterrumpida en todas las entidades, sin tope de 24 meses
@@ -779,6 +849,7 @@ variables:
     observaciones: El 43% de los deudores en situación 1 lo está desde antes de 2020.
 
   - nombre: CEN_FLG_FALLECIDO_1M
+    sql: "per.FALLECIDO"
     bloque: B09_PERSONA
     fuente: PADRON
     uso: exclusion
@@ -790,6 +861,7 @@ variables:
     observaciones: Se excluye de la población de modelado; 219 mil deudores con deuda vigente, 79% en situación 3+.
 
   - nombre: CEN_FLG_CUIT_REEMPLAZADO_1M
+    sql: "x.REEMPLAZADO_12"
     bloque: B09_PERSONA
     fuente: PADRON
     descripcion: La historia incluye un CUIT dado de baja que fue reemplazado por el actual
@@ -799,6 +871,7 @@ variables:
     sentido: "?"
 
   - nombre: CEN_CAT_SEXO_1M
+    sql: "per.SEXO"
     bloque: B09_PERSONA
     fuente: PADRON
     uso: monitoreo
@@ -811,6 +884,7 @@ variables:
 
   # ------------------------------------------------------------------ B10 ALERTAS
   - nombre: CEN_FLG_ALERTA_DETERIORO_3M
+    sql: "(ult(s.SIT) >= 2 AND ini(s.SIT, 3) = 1)::INT"
     bloque: B10_ALERTAS
     descripcion: Pasó de situación 1 a situación 2 o peor en los últimos 3 meses
     definicion: SIT_t >= 2 AND SIT_(t-2) = 1
@@ -819,6 +893,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_ALERTA_CONTAGIO_3M
+    sql: "(x.ENT_EMPEORA_3 >= 2 AND ult(s.ENT_IRR) >= 2)::INT"
     bloque: B10_ALERTAS
     descripcion: Entró en situación 2 o peor en dos o más entidades en los últimos 3 meses
     definicion: CEN_CNT_ENT_EMPEORA_3M >= 2 AND ENT_IRR_t >= 2
@@ -827,6 +902,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_ALERTA_SOBREENDEUDAMIENTO_6M
+    sql: "(coalesce(ult(s.DEUDA) / nullif(ini(s.DEUDA, 6), 0), 0) >= 1.5 AND list_sum(ven(s.ALTAS, 6)) >= 2)::INT"
     bloque: B10_ALERTAS
     descripcion: Deuda creciendo fuerte con relaciones nuevas
     definicion: CEN_TEN_DEUDA_6M >= 1.5 AND CEN_CNT_ALTAS_6M >= 2
@@ -836,6 +912,7 @@ variables:
     observaciones: Umbrales iniciales; se calibran con el informe de poder.
 
   - nombre: CEN_FLG_ALERTA_REFUGIO_NO_BANCARIO_6M
+    sql: "(x.BAJAS_BANC_6 >= 1 AND x.ALTAS_NOBANC_6 >= 1)::INT"
     bloque: B10_ALERTAS
     descripcion: Cerró relaciones bancarias y abrió no bancarias en los últimos 6 meses
     definicion: bajas con BANCO o CIA_FIN >= 1 AND altas con TARJETA_NB, PNFC o FIDEICOMISO >= 1 en t-5..t
@@ -844,6 +921,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_ALERTA_REINCIDENCIA_12M
+    sql: "regexp_matches(cod_sit(ven(s.SIT, 12)), '2[01]*1[01]*2')::INT"
     bloque: B10_ALERTAS
     descripcion: Se curó de situación 2+ y volvió a caer en los últimos 12 meses
     definicion: secuencia SIT >= 2, luego SIT = 1, luego SIT >= 2 dentro de t-11..t
@@ -852,6 +930,8 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_ALERTAS_1M
+    sql: "CEN_FLG_ALERTA_DETERIORO_3M + CEN_FLG_ALERTA_CONTAGIO_3M + CEN_FLG_ALERTA_SOBREENDEUDAMIENTO_6M + CEN_FLG_ALERTA_REFUGIO_NO_BANCARIO_6M + CEN_FLG_ALERTA_REINCIDENCIA_12M"
+    capa: 2
     bloque: B10_ALERTAS
     descripcion: Cantidad de alertas activas
     definicion: suma de las CEN_FLG_ALERTA_*

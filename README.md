@@ -16,7 +16,25 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 Requiere Python ≥ 3.10. Para descomprimir el archivo del BCRA hace falta `7z` (`brew install p7zip`).
 
-## Flujo mensual
+## v2 (en construcción): variables `CEN_*` desde el catálogo
+
+Rediseño de las variables (ver [PLAN.md](PLAN.md)). Las definiciones viven en [`catalogo/variables.yaml`](catalogo/variables.yaml): cada variable trae descripción, fórmula, fuente, nulos y su expresión SQL sobre series mensuales densas por CUIT. El SQL se arma desde el catálogo; no hay SQL de variables escrito a mano.
+
+```bash
+# 1. Paquetes del mes (BCRA + padrón ARCA) a Parquet
+python estudios/convertir_paquete_mensual.py ~/Downloads data --periodo 202609 --padron 20261030
+# 2. Base limpia: 24DSF + mensual del último mes, equivalencias de entidades, CUITs reemplazados, pesos constantes
+cendeu base data/deudores_24m data/v2/base --ipc data/ipc.csv --mensual data/deudores_mensual \
+    --padron data/padron/corte=20261030/padron.parquet --uno-dsf data/desde_sit1/periodo=202609/data.parquet --base-ipc 202609
+# 3. Variables a cada fecha de observación (con target a 6 meses si hay desempeño)
+cendeu variables-v2 data/v2/base data/v2/variables --obs 202509 202510 202511 202512 202601 202602 202603
+# 4. Subida a S3 (una carpeta por período, verifica tamaños)
+cendeu subir data/v2/variables variables --simular
+```
+
+Referencias públicas (sin datos personales) en [`referencias/`](referencias/): tipo de entidad, fideicomisos de recupero y equivalencias por fusiones.
+
+## Flujo mensual (v1)
 
 1. **Descarga**: ARCA con clave fiscal → *BCRA – Cheques y Deudores* → *Deudores* → `24DSFAAAAMM.7Z` (aceptar la DJ de la Ley 25.326).
 2. **Pipeline**:

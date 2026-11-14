@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from . import pipeline, scorecard, scoring
+from . import pipeline, s3, scorecard, scoring, v2
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -35,6 +35,27 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("scorear", help="aplica el scorecard a un Parquet de variables")
     p.add_argument("variables"); p.add_argument("modelo_json"); p.add_argument("salida")
 
+    p = sub.add_parser("base", help="v2: base limpia (24DSF + mensual, equivalencias, IPC) por período y bucket")
+    p.add_argument("dir_24dsf"); p.add_argument("salida")
+    p.add_argument("--ipc", required=True); p.add_argument("--referencias", default="referencias")
+    p.add_argument("--mensual"); p.add_argument("--padron"); p.add_argument("--uno-dsf")
+    p.add_argument("--base-ipc", type=int, help="período de los pesos constantes (default: último del IPC)")
+
+    p = sub.add_parser("variables-v2", help="v2: variables del catálogo a una o más fechas de observación")
+    p.add_argument("dir_base"); p.add_argument("salida")
+    p.add_argument("--obs", type=int, nargs="+", required=True)
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--buckets", type=int, nargs="*", help="sólo estos buckets (prueba)")
+
+    p = sub.add_parser("catalogo", help="v2: valida el catálogo y muestra el conteo por bloque")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+
+    p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
+    p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
+    p.add_argument("--perfil", default="fmargara")
+    p.add_argument("--renombrar", nargs="*", default=[], help="local=s3, p. ej. data_0.parquet=data.parquet")
+    p.add_argument("--simular", action="store_true", help="sólo muestra qué subiría")
+
     a = ap.parse_args(argv)
     kw = {"memory_limit": a.memoria}
     if a.cmd == "ipc":
@@ -49,6 +70,23 @@ def main(argv: list[str] | None = None) -> None:
         print(pipeline.iv_gini(a.variables, a.resumen, a.bins, **kw).to_string(index=False))
     elif a.cmd == "entrenar":
         scorecard.entrenar(a.variables, a.modelo_json, pct_muestra=a.pct_muestra, max_vars=a.max_vars)
+    elif a.cmd == "base":
+        v2.construir_base(a.dir_24dsf, a.salida, a.ipc, a.referencias, mensual=a.mensual, padron=a.padron,
+                          uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, **kw)
+    elif a.cmd == "variables-v2":
+        for obs in a.obs:
+            v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, **kw)
+    elif a.cmd == "subir":
+        filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
+        malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]
+        if malos:
+            raise SystemExit(f"{len(malos)} archivos con tamaño distinto")
+    elif a.cmd == "catalogo":
+        from . import catalogo
+        c = catalogo.cargar(a.catalogo)
+        print(f"{len(c.variables)} variables", c.por_bloque())
+        if c.errores:
+            raise SystemExit("\n".join(c.errores))
     elif a.cmd == "scorear":
         scoring.scorear_parquet(a.variables, a.modelo_json, a.salida)
 
