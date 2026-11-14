@@ -30,7 +30,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 | # | Fase | Entregable | Estado |
 |---|---|---|---|
-| 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | en curso |
+| 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | hecho (tamaños verificados contra local) |
 | 1 | Estudio de datos del 24DSF | [`reportes/estudio_24dsf.md`](reportes/estudio_24dsf.md) | hecho (pendiente: tabla de entidades BCRA, confirmar 202609) |
 | 2 | Catálogo de variables por bloques | `catalogo/variables.yaml` | pendiente |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | `src/cendeu/` | pendiente |
