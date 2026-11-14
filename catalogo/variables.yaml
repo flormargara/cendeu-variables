@@ -1,0 +1,861 @@
+# Catálogo de variables CENDEU v2
+#
+# Fuente única de verdad: de acá se generan el SQL (Fase 3), el diccionario de variables (Fase 4)
+# y la lista que evalúa el informe de poder (Fase 5).
+#
+# Nombre: CEN_<OPERACION>_<DESCRIPCION>_<VENTANA>
+#   - OPERACION: código de la tabla `operaciones`.
+#   - VENTANA: <n>M = últimos n meses terminando en la fecha de observación (1M = el mes de observación).
+#
+# Las entradas de `variables` pueden expandirse: `expandir: {v: [3, 6, 12]}` genera una variable por
+# valor, sustituyendo {v} en nombre, descripción y definición. Varias claves generan el producto
+# cartesiano. Las claves que son nombres de diccionarios del catálogo (serie, tipo) además habilitan
+# {serie_desc} / {tipo_desc}.
+
+version: 1
+prefijo: CEN
+
+convenciones:
+  grilla: >
+    Todas las series se calculan sobre una grilla densa CUIT × mes: un CUIT que no figura en un mes
+    tiene deuda 0, situación 0 y 0 entidades. Así las diferencias, ratios temporales y RSI no saltan
+    meses (error del Feature Store CRC).
+  montos: >
+    Miles de pesos constantes de un mes base fijo (default 202609), deflactados por IPC INDEC.
+    Los ratios no dependen de la base.
+  entidades: >
+    Se aplica referencias/entidades_equivalencias.csv antes de contar entidades, altas, bajas y
+    principalidad (las fusiones no generan relaciones nuevas falsas).
+  cuits: >
+    Sólo tipo_id = 11. CUITs dados de baja en el padrón se reemplazan por su CUIT de reemplazo.
+  situacion: >
+    Escala 1–5 (la 11 del mensual se trata como 1); 0 = ausente de la central.
+  historia: >
+    El 24DSF cubre 24 meses. Para la primera fecha de observación de modelado (202509) hay
+    exactamente 12 meses de historia, por eso la ventana máxima es 12M.
+  division_por_cero: Los ratios con denominador 0 son nulos, nunca 0 ni infinito.
+
+operaciones:
+  MTO: Monto en el mes
+  SUM: Suma en la ventana
+  AVG: Promedio en la ventana
+  MAX: Máximo en la ventana
+  MIN: Mínimo en la ventana
+  STD: Desvío estándar en la ventana
+  CV: Coeficiente de variación (desvío / promedio) en la ventana
+  CNT: Conteo
+  PCT: Proporción (0 a 1)
+  RAT: Ratio entre dos magnitudes
+  FLG: Indicador 0/1
+  CAT: Categoría
+  MOD: Moda en la ventana
+  RCM: Recencia, meses desde un evento (0 = ocurre en el mes de observación)
+  VAR: Variación relativa mes a mes, (x_t - x_{t-1}) / x_{t-1}
+  TEN: Tendencia, x_t / x_{t-n+1} (actual contra el inicio de la ventana)
+  FMX: Fracción del total, x_t / suma de la ventana
+  DIF: Diferencia absoluta, x_t - x_{t-n+1}
+  PND: Pendiente de la regresión lineal de x sobre el mes, dividida por el promedio
+  RSI: Relative Strength Index, 100 - 100 / (1 + subas / bajas) sobre las variaciones mensuales de la ventana
+  IDX: Índice compuesto (HHI, entropía)
+  VAL: Valor de un atributo de la persona a la fecha de observación
+
+fuentes:
+  24DSF: Bianual de la Central de Deudores (24 meses, situación y monto por CUIT × entidad)
+  MENSUAL: deudores.txt mensual (24 campos; sólo existe desde 202609, hay que acumularlo)
+  1DSF: Fecha desde la cual el deudor está en situación 1 en todas las entidades (sin tope de 24 meses)
+  MAEENT: Maestro de entidades del BCRA + referencias/entidades.csv
+  PADRON: Padrón de ARCA (foto, corte 20261030)
+
+bloques:
+  B01_MAGNITUD: Cuánto debe y cuánto de eso es irregular
+  B02_CALIDAD: Qué tan mala es y fue su situación
+  B03_TRANSICIONES: Cómo se mueve entre situaciones (rolls, curas, rachas)
+  B04_VELOCIDAD: A qué ritmo cambian deuda, irregularidad y relaciones
+  B05_MOMENTUM: RSI, fuerza de la tendencia reciente
+  B06_RELACION_SISTEMA: Con cuántas y cuáles entidades opera, altas, bajas, principalidad, concentración
+  B07_MIX_ENTIDADES: Con qué tipo de entidades se endeuda
+  B08_FOTO_MENSUAL: Campos que sólo trae el mensual (atraso, refinanciación, garante)
+  B09_PERSONA: Atributos de la persona (padrón, 1DSF)
+  B10_ALERTAS: Combinaciones de señales tempranas
+
+# Series mensuales sobre la grilla densa (insumo de las variables; no se publican)
+series:
+  DEUDA: Deuda total (todas las entidades)
+  DEUDA_IRR: Deuda en situación 2 o peor
+  DEUDA_MORA: Deuda en situación 3 o peor
+  SIT: Peor situación entre entidades (0 = ausente)
+  SIT_POND: Situación promedio ponderada por monto (nula si ausente)
+  ENT: Cantidad de entidades
+  ENT_IRR: Cantidad de entidades con situación 2 o peor
+  PCT_IRR: Proporción de la deuda en situación 2 o peor (nula si deuda 0)
+  HHI: Concentración de la deuda entre entidades, suma de participaciones al cuadrado
+  ENT_PRINC: Entidad con mayor deuda (desempate por menor código)
+
+# Nombre de las operaciones en las descripciones expandidas ({op_desc})
+op:
+  AVG: Promedio
+  MAX: Máximo
+
+# tipo_agrupado de referencias/entidades.csv
+tipo:
+  BANCO: bancos
+  CIA_FIN: compañías financieras
+  TARJETA_NB: emisoras no bancarias de tarjetas
+  PNFC: proveedores no financieros de crédito
+  FIDEICOMISO: fideicomisos financieros
+
+defaults:
+  fuente: 24DSF
+  tipo_dato: DECIMAL
+  uso: modelo
+  disponible_desde: 202410
+  unidad_tiempo: mes
+  actualizacion: mensual
+
+targets:
+  - nombre: CEN_TGT_SIT3P_6M
+    descripcion: Llega a situación 3 o peor en alguna entidad en los 6 meses posteriores a la observación
+    definicion: max(SIT) en t+1..t+6 >= 3
+    poblacion: >
+      CUITs presentes en el mes de observación con SIT <= 2, tipo_id 11, no fallecidos
+      a la fecha de observación.
+    observaciones: >
+      Ausente en el desempeño = sin deuda informada (no es default). Target a 12 meses
+      (CEN_TGT_SIT3P_12M) queda para iteraciones futuras.
+
+variables:
+
+  # ------------------------------------------------------------------ B01 MAGNITUD
+  - nombre: CEN_MTO_{serie}_1M
+    expandir: {serie: [DEUDA, DEUDA_IRR, DEUDA_MORA]}
+    bloque: B01_MAGNITUD
+    descripcion: "{serie_desc} en el mes de observación"
+    definicion: "{serie}_t"
+    unidad: miles de $ constantes
+    nulos: nunca (0 si no tiene deuda de ese tipo)
+    sentido: "+"
+
+  - nombre: CEN_{op}_DEUDA_{v}M
+    expandir: {op: [AVG, MAX], v: [3, 6, 12]}
+    bloque: B01_MAGNITUD
+    descripcion: "{op_desc} de la deuda total en los últimos {v} meses"
+    definicion: "{op}(DEUDA) sobre t-{v1}..t"
+    unidad: miles de $ constantes
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_{op}_DEUDA_IRR_{v}M
+    expandir: {op: [AVG, MAX], v: [3, 6, 12]}
+    bloque: B01_MAGNITUD
+    descripcion: "{op_desc} de la deuda en situación 2 o peor en los últimos {v} meses"
+    definicion: "{op}(DEUDA_IRR) sobre t-{v1}..t"
+    unidad: miles de $ constantes
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_PCT_DEUDA_IRR_1M
+    bloque: B01_MAGNITUD
+    descripcion: Proporción de la deuda actual en situación 2 o peor
+    definicion: DEUDA_IRR_t / DEUDA_t
+    unidad: proporción
+    nulos: sin deuda en el mes
+    sentido: "+"
+
+  - nombre: CEN_AVG_PCT_DEUDA_IRR_{v}M
+    expandir: {v: [3, 6, 12]}
+    bloque: B01_MAGNITUD
+    descripcion: "Promedio de la proporción de deuda irregular en los últimos {v} meses"
+    definicion: "AVG(PCT_IRR) sobre t-{v1}..t, ignorando meses sin deuda"
+    unidad: proporción
+    nulos: sin deuda en toda la ventana
+    sentido: "+"
+
+  # ------------------------------------------------------------------ B02 CALIDAD
+  - nombre: CEN_MAX_SIT_{v}M
+    expandir: {v: [1, 3, 6, 12]}
+    bloque: B02_CALIDAD
+    descripcion: "Peor situación en los últimos {v} meses"
+    definicion: "MAX(SIT) sobre t-{v1}..t"
+    tipo_dato: INTEGER
+    unidad: situación 0-5
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_AVG_SIT_POND_{v}M
+    expandir: {v: [1, 3, 6, 12]}
+    bloque: B02_CALIDAD
+    descripcion: "Situación ponderada por monto, promedio de los últimos {v} meses"
+    definicion: "AVG(SIT_POND) sobre t-{v1}..t, ignorando meses ausente"
+    unidad: situación 1-5
+    nulos: ausente en toda la ventana
+    sentido: "+"
+
+  - nombre: CEN_CNT_MESES_SIT2P_{v}M
+    expandir: {v: [3, 6, 12]}
+    bloque: B02_CALIDAD
+    descripcion: "Meses con situación 2 o peor en los últimos {v} meses"
+    definicion: "COUNT(SIT >= 2) sobre t-{v1}..t"
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_MESES_SIT3P_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B02_CALIDAD
+    descripcion: "Meses con situación 3 o peor en los últimos {v} meses"
+    definicion: "COUNT(SIT >= 3) sobre t-{v1}..t"
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "+"
+    observaciones: La población del target excluye SIT_t >= 3, pero puede haberla tenido antes.
+
+  - nombre: CEN_MOD_SIT_12M
+    bloque: B02_CALIDAD
+    descripcion: Situación más frecuente en los últimos 12 meses (incluye 0 = ausente)
+    definicion: MODE(SIT) sobre t-11..t; desempate por la peor
+    tipo_dato: INTEGER
+    unidad: situación 0-5
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_RCM_SIT2P_12M
+    bloque: B02_CALIDAD
+    descripcion: Meses desde la última vez en situación 2 o peor
+    definicion: t - último mes con SIT >= 2 en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca tuvo situación 2+ en la ventana
+    sentido: "-"
+
+  - nombre: CEN_RCM_SIT3P_12M
+    bloque: B02_CALIDAD
+    descripcion: Meses desde la última vez en situación 3 o peor
+    definicion: t - último mes con SIT >= 3 en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca tuvo situación 3+ en la ventana
+    sentido: "-"
+
+  - nombre: CEN_RCM_PEOR_SIT_12M
+    bloque: B02_CALIDAD
+    descripcion: Meses desde el peor momento (máxima situación) de los últimos 12 meses
+    definicion: t - último mes con SIT = MAX(SIT) en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "-"
+
+  - nombre: CEN_FLG_PEOR_MOMENTO_1M
+    bloque: B02_CALIDAD
+    descripcion: El mes de observación es el peor de los últimos 12 meses y la situación es 2 o peor
+    definicion: SIT_t = MAX(SIT en t-11..t) AND SIT_t >= 2
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_ENT_SIT2P_1M
+    bloque: B02_CALIDAD
+    descripcion: Entidades en las que tiene situación 2 o peor en el mes
+    definicion: ENT_IRR_t
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_ENT_SIT3P_12M
+    bloque: B02_CALIDAD
+    descripcion: Entidades distintas en las que tuvo situación 3 o peor en los últimos 12 meses
+    definicion: COUNT DISTINCT entidad con situación >= 3 en t-11..t
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_FLG_PROC_JUDICIAL_12M
+    bloque: B02_CALIDAD
+    descripcion: Alguna deuda informada en proceso judicial o revisión (Ley 25.326) en los últimos 12 meses
+    definicion: MAX(flag IN (1, 2)) en t-11..t
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+    observaciones: 460 filas en 24 meses; se mantiene por pedido del estudio pero se espera poder casi nulo.
+
+  # ------------------------------------------------------------------ B03 TRANSICIONES
+  - nombre: CEN_CNT_EMPEORA_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B03_TRANSICIONES
+    descripcion: "Meses en que empeoró la situación respecto del mes anterior, últimos {v} meses"
+    definicion: "COUNT(SIT_m > SIT_{m-1} AND SIT_{m-1} >= 1) para m en t-{v2}..t"
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "+"
+    observaciones: No cuenta las altas (0 -> k).
+
+  - nombre: CEN_CNT_MEJORA_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B03_TRANSICIONES
+    descripcion: "Meses en que mejoró la situación respecto del mes anterior, últimos {v} meses"
+    definicion: "COUNT(SIT_m < SIT_{m-1} AND SIT_m >= 1) para m en t-{v2}..t"
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "-"
+
+  - nombre: CEN_RAT_CURA_12M
+    bloque: B03_TRANSICIONES
+    descripcion: Tasa de cura individual, salidas de situación 2+ a situación 1 sobre meses en situación 2+
+    definicion: COUNT(SIT_{m-1} >= 2 AND SIT_m = 1) / COUNT(SIT_{m-1} >= 2) en t-11..t
+    unidad: proporción
+    nulos: no estuvo en situación 2+ en la ventana
+    sentido: "-"
+
+  - nombre: CEN_RAT_ROLL_2A3_12M
+    bloque: B03_TRANSICIONES
+    descripcion: Tasa de roll individual de situación 2 a 3 o peor
+    definicion: COUNT(SIT_{m-1} = 2 AND SIT_m >= 3) / COUNT(SIT_{m-1} = 2) en t-11..t
+    unidad: proporción
+    nulos: no estuvo en situación 2 en la ventana
+    sentido: "+"
+    observaciones: Roll de 2 a 3 del sistema = 34% mensual (estudio, sección 4).
+
+  - nombre: CEN_MAX_RACHA_SIT2P_12M
+    bloque: B03_TRANSICIONES
+    descripcion: Racha más larga de meses consecutivos en situación 2 o peor
+    definicion: máxima longitud de corrida SIT >= 2 en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_RACHA_SIT2P_1M
+    bloque: B03_TRANSICIONES
+    descripcion: Meses consecutivos en situación 2 o peor hasta el mes de observación
+    definicion: longitud de la corrida SIT >= 2 que termina en t (0 si SIT_t < 2)
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_RACHA_SIT1_1M
+    bloque: B03_TRANSICIONES
+    descripcion: Meses consecutivos en situación 1 hasta el mes de observación (tope 12)
+    definicion: longitud de la corrida SIT = 1 que termina en t, contando ausencias intermedias como neutras
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "-"
+    observaciones: Versión sin tope en CEN_CNT_MESES_SIT1_ININT_1M (bloque persona, desde 1DSF).
+
+  - nombre: CEN_MAX_SALTO_SIT_12M
+    bloque: B03_TRANSICIONES
+    descripcion: Mayor empeoramiento de situación entre dos meses consecutivos
+    definicion: MAX(SIT_m - SIT_{m-1}) con SIT_{m-1} >= 1, en t-11..t (0 si nunca empeoró)
+    tipo_dato: INTEGER
+    unidad: niveles de situación
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_FLG_ENTRADA_SIT4P_12M
+    bloque: B03_TRANSICIONES
+    descripcion: Alguna relación nueva con una entidad que aparece directamente en situación 4 o peor
+    definicion: existe (entidad, m) en t-11..t con situación >= 4 y sin presencia de esa entidad en m-1
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+    observaciones: Proxy de cartera cedida o comprada (estudio, hallazgo 6; fideicomisos de recupero).
+
+  - nombre: CEN_CNT_ENT_EMPEORA_3M
+    bloque: B03_TRANSICIONES
+    descripcion: Entidades en las que la situación actual es peor que hace 3 meses
+    definicion: COUNT entidades con situación_t > situación_{t-2} (presentes en ambos meses)
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+
+  # ------------------------------------------------------------------ B04 VELOCIDAD
+  - nombre: CEN_VAR_DEUDA_1M
+    bloque: B04_VELOCIDAD
+    descripcion: Variación relativa de la deuda total respecto del mes anterior
+    definicion: (DEUDA_t - DEUDA_{t-1}) / DEUDA_{t-1}
+    unidad: proporción
+    nulos: sin deuda el mes anterior
+    sentido: "+"
+
+  - nombre: CEN_AVG_VAR_DEUDA_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B04_VELOCIDAD
+    descripcion: "Promedio de las variaciones mensuales de la deuda en los últimos {v} meses"
+    definicion: "AVG(VAR(DEUDA)) sobre t-{v2}..t, ignorando meses con deuda previa 0"
+    unidad: proporción
+    nulos: sin variaciones calculables
+    sentido: "+"
+
+  - nombre: CEN_TEN_{serie}_{v}M
+    expandir: {serie: [DEUDA, DEUDA_IRR, ENT], v: [3, 6, 12]}
+    bloque: B04_VELOCIDAD
+    descripcion: "{serie_desc}: valor actual sobre el de hace {v} meses"
+    definicion: "{serie}_t / {serie}_(t-{v1})"
+    unidad: ratio
+    nulos: valor 0 al inicio de la ventana
+    sentido: "+"
+
+  - nombre: CEN_FMX_{serie}_{v}M
+    expandir: {serie: [DEUDA, ENT], v: [3, 6, 12]}
+    bloque: B04_VELOCIDAD
+    descripcion: "{serie_desc}: peso del mes actual en el total de los últimos {v} meses"
+    definicion: "{serie}_t / SUM({serie}) sobre t-{v1}..t"
+    unidad: proporción (1/{v} = estable)
+    nulos: suma 0 en la ventana
+    sentido: "+"
+
+  - nombre: CEN_DIF_SIT_{v}M
+    expandir: {v: [3, 6, 12]}
+    bloque: B04_VELOCIDAD
+    descripcion: "Cambio de la peor situación respecto de hace {v} meses"
+    definicion: "SIT_t - SIT_(t-{v1})"
+    tipo_dato: INTEGER
+    unidad: niveles de situación
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CV_DEUDA_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B04_VELOCIDAD
+    descripcion: "Coeficiente de variación de la deuda en los últimos {v} meses"
+    definicion: "STD(DEUDA) / AVG(DEUDA) sobre t-{v1}..t"
+    unidad: ratio
+    nulos: promedio 0
+    sentido: "+"
+
+  - nombre: CEN_PND_DEUDA_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B04_VELOCIDAD
+    descripcion: "Pendiente relativa de la deuda en los últimos {v} meses (crecimiento mensual promedio)"
+    definicion: "REGR_SLOPE(DEUDA, m) / AVG(DEUDA) sobre t-{v1}..t"
+    unidad: proporción por mes
+    nulos: promedio 0
+    sentido: "+"
+
+  # ------------------------------------------------------------------ B05 MOMENTUM
+  - nombre: CEN_RSI_{serie}_{v}M
+    expandir: {serie: [DEUDA, DEUDA_IRR, ENT, SIT], v: [3, 6, 12]}
+    bloque: B05_MOMENTUM
+    descripcion: "{serie_desc}: RSI de los últimos {v} meses"
+    definicion: "100 - 100 / (1 + SUM(subas) / SUM(bajas)) de las diferencias mensuales de {serie} en t-{v1}..t; 100 si sólo hay subas"
+    unidad: índice 0-100
+    nulos: sin variaciones en la ventana (serie constante)
+    sentido: "+"
+    observaciones: Sobre la grilla densa (en el CRC se calculaba con huecos).
+
+  # ------------------------------------------------------------------ B06 RELACIÓN CON EL SISTEMA
+  - nombre: CEN_CNT_ENT_1M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Entidades con las que tiene deuda en el mes
+    definicion: ENT_t
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_{op}_ENT_{v}M
+    expandir: {op: [AVG, MAX], v: [6, 12]}
+    bloque: B06_RELACION_SISTEMA
+    descripcion: "{op_desc} de la cantidad de entidades en los últimos {v} meses"
+    definicion: "{op}(ENT) sobre t-{v1}..t"
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_ENT_DISTINTAS_12M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Entidades distintas con las que tuvo deuda en los últimos 12 meses
+    definicion: COUNT DISTINCT entidad en t-11..t
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_ALTAS_{v}M
+    expandir: {v: [3, 6, 12]}
+    bloque: B06_RELACION_SISTEMA
+    descripcion: "Relaciones nuevas con entidades en los últimos {v} meses"
+    definicion: "COUNT (entidad, m) en t-{v1}..t con deuda en m y sin deuda en esa entidad en m-1"
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "+"
+    observaciones: Requiere un mes previo a la ventana; con equivalencias aplicadas.
+
+  - nombre: CEN_CNT_BAJAS_{v}M
+    expandir: {v: [3, 6, 12]}
+    bloque: B06_RELACION_SISTEMA
+    descripcion: "Relaciones con entidades que se cerraron en los últimos {v} meses"
+    definicion: "COUNT (entidad, m) en t-{v1}..t sin deuda en m y con deuda en esa entidad en m-1"
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "-"
+
+  - nombre: CEN_RCM_ULTIMA_ALTA_12M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Meses desde la última relación nueva
+    definicion: t - último mes con un alta en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: sin altas en la ventana
+    sentido: "-"
+
+  - nombre: CEN_RAT_PRINCIPALIDAD_1M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Peso de la entidad principal en la deuda total
+    definicion: deuda en ENT_PRINC_t / DEUDA_t
+    unidad: proporción
+    nulos: sin deuda en el mes
+    sentido: "-"
+
+  - nombre: CEN_CNT_CAMBIO_PRINC_{v}M
+    expandir: {v: [6, 12]}
+    bloque: B06_RELACION_SISTEMA
+    descripcion: "Veces que cambió la entidad principal en los últimos {v} meses"
+    definicion: "COUNT(ENT_PRINC_m <> ENT_PRINC_{m-1}) con deuda en ambos meses, m en t-{v2}..t"
+    tipo_dato: INTEGER
+    unidad: cambios
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_IDX_HHI_1M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Concentración de la deuda entre entidades (1 = una sola entidad)
+    definicion: HHI_t = SUM((deuda_entidad / DEUDA_t)^2)
+    unidad: índice 0-1
+    nulos: sin deuda en el mes
+    sentido: "-"
+
+  - nombre: CEN_CNT_MESES_PRESENTE_12M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Meses con deuda informada en los últimos 12 meses
+    definicion: COUNT(SIT >= 1) en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "-"
+
+  - nombre: CEN_CNT_HUECOS_12M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Meses ausente entre la primera y la última aparición de los últimos 12 meses
+    definicion: (último mes presente - primer mes presente + 1) - CNT_MESES_PRESENTE en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: nunca
+    sentido: "+"
+    observaciones: El 21% de los CUITs tiene huecos (estudio, hallazgo 4).
+
+  - nombre: CEN_RCM_PRIMERA_APARICION_12M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Antigüedad en la central dentro de la ventana, meses desde la primera aparición
+    definicion: t - primer mes con SIT >= 1 en t-11..t
+    tipo_dato: INTEGER
+    unidad: meses (tope 11)
+    nulos: nunca (la población está presente en t)
+    sentido: "-"
+    observaciones: Truncada a 12 meses por la historia disponible; complementa CEN_CNT_MESES_SIT1_ININT_1M.
+
+  - nombre: CEN_FLG_REACTIVACION_12M
+    bloque: B06_RELACION_SISTEMA
+    descripcion: Volvió a la central después de 3 o más meses ausente
+    definicion: existe m en t-11..t con SIT_m >= 1 y SIT = 0 en m-3..m-1 y presencia antes de m-3
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  # ------------------------------------------------------------------ B07 MIX POR TIPO DE ENTIDAD
+  - nombre: CEN_PCT_DEUDA_{tipo}_1M
+    expandir: {tipo: [BANCO, CIA_FIN, TARJETA_NB, PNFC, FIDEICOMISO]}
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: "Proporción de la deuda con {tipo_desc}"
+    definicion: "deuda con tipo_agrupado {tipo} / DEUDA_t"
+    unidad: proporción
+    nulos: sin deuda en el mes
+    sentido: "según tipo: bancos -, PNFC y fideicomisos +"
+
+  - nombre: CEN_CNT_ENT_{tipo}_1M
+    expandir: {tipo: [BANCO, TARJETA_NB, PNFC]}
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: "Cantidad de {tipo_desc} con las que tiene deuda"
+    definicion: "COUNT DISTINCT entidad con tipo_agrupado {tipo} en t"
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca
+    sentido: "según tipo"
+
+  - nombre: CEN_CNT_TIPOS_ENT_1M
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: Cantidad de tipos de entidad distintos con los que tiene deuda
+    definicion: COUNT DISTINCT tipo_agrupado en t
+    tipo_dato: INTEGER
+    unidad: tipos
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_IDX_ENTROPIA_TIPO_{v}M
+    expandir: {v: [1, 6]}
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: "Entropía de Shannon de la deuda por tipo de entidad (promedio de {v} meses)"
+    definicion: "AVG(-SUM(p_tipo * ln p_tipo)) sobre t-{v1}..t, p_tipo = participación de la deuda por tipo_agrupado"
+    unidad: nats
+    nulos: sin deuda en toda la ventana
+    sentido: "+"
+
+  - nombre: CEN_FLG_SOLO_NO_BANCARIA_1M
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: Toda su deuda es con entidades no bancarias (ni bancos ni compañías financieras)
+    definicion: DEUDA_t > 0 AND deuda con BANCO y CIA_FIN = 0
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_MAX_SIT_{grupo}_12M
+    expandir: {grupo: [BANCARIA, NO_BANCARIA]}
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: "Peor situación con entidades del grupo {grupo} en los últimos 12 meses"
+    definicion: "MAX(situación) con entidades BANCO o CIA_FIN (BANCARIA) / resto (NO_BANCARIA) en t-11..t; 0 si no tuvo"
+    tipo_dato: INTEGER
+    unidad: situación 0-5
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_TEN_DEUDA_PNFC_6M
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: Deuda con proveedores no financieros, actual sobre la de hace 6 meses
+    definicion: deuda PNFC_t / deuda PNFC_(t-5)
+    unidad: ratio
+    nulos: sin deuda PNFC hace 6 meses
+    sentido: "+"
+
+  - nombre: CEN_FLG_FIDEICOMISO_RECUPERO_12M
+    bloque: B07_MIX_ENTIDADES
+    fuente: 24DSF + MAEENT
+    descripcion: Tuvo deuda con un fideicomiso de recupero de cartera en los últimos 12 meses
+    definicion: deuda en t-11..t con una entidad marcada recupero = 1 en referencias/entidades.csv
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+    observaciones: Marca por nombre (Recupero, Asset Recovery, Gestión de Activos); los fideicomisos sin nombre en el maestro quedan sin marcar.
+
+  # ------------------------------------------------------------------ B08 FOTO DEL MENSUAL
+  # Sólo existen desde 202609: no entran al modelo hasta acumular mensuales que cubran
+  # las fechas de observación. Se calculan y se monitorean desde ya.
+  - nombre: CEN_MAX_DIAS_ATRASO_1M
+    bloque: B08_FOTO_MENSUAL
+    fuente: MENSUAL
+    disponible_desde: 202609
+    uso: futuro
+    descripcion: Máximo de días de atraso informado entre entidades
+    definicion: MAX(dias_atraso) en t
+    tipo_dato: INTEGER
+    unidad: días
+    nulos: ninguna entidad informa días de atraso para el CUIT
+    sentido: "+"
+    observaciones: Lo informan 162 de 545 entidades, casi sólo para situación 2+.
+
+  - nombre: CEN_CNT_ENT_{campo}_1M
+    expandir: {campo: [REFINANCIACION, RECATEG_OBLIG, SIT_JURIDICA, IRRECUP_DISP_TECNICA]}
+    bloque: B08_FOTO_MENSUAL
+    fuente: MENSUAL
+    disponible_desde: 202609
+    uso: futuro
+    descripcion: "Entidades que informan {campo} = 1"
+    definicion: "COUNT entidades con el campo {campo} = 1 en t"
+    tipo_dato: INTEGER
+    unidad: entidades
+    nulos: nunca (9 = no aplica cuenta como 0)
+    sentido: "+"
+    observaciones: Refinanciación, situación jurídica e irrecuperable sólo aplican a bancos y compañías financieras.
+
+  - nombre: CEN_FLG_GARANTE_1M
+    bloque: B08_FOTO_MENSUAL
+    fuente: MENSUAL
+    disponible_desde: 202609
+    uso: futuro
+    descripcion: Figura como garante (garantías otorgadas > 0) en alguna entidad
+    definicion: SUM(garantias_otorgadas) > 0 en t
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "?"
+    observaciones: Única aproximación a la codeudoría del CRC.
+
+  - nombre: CEN_PCT_DEUDA_GTIA_PREF_1M
+    bloque: B08_FOTO_MENSUAL
+    fuente: MENSUAL
+    disponible_desde: 202609
+    uso: futuro
+    descripcion: Proporción de la deuda con garantía preferida A o B
+    definicion: SUM(gtia_pref_a + gtia_pref_b) / SUM(prestamos) en t
+    unidad: proporción
+    nulos: sin préstamos en el mes
+    sentido: "-"
+
+  # ------------------------------------------------------------------ B09 PERSONA
+  - nombre: CEN_VAL_EDAD_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    descripcion: Edad en años a la fecha de observación (personas humanas)
+    definicion: años entre fecha_nac_contrato y el último día del mes de observación
+    tipo_dato: INTEGER
+    unidad: años
+    nulos: persona jurídica o fecha no informada (1901-01-01)
+    sentido: "-"
+
+  - nombre: CEN_VAL_ANTIG_EMPRESA_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    descripcion: Años desde el contrato social a la fecha de observación (personas jurídicas)
+    definicion: años entre fecha_nac_contrato y el último día del mes de observación
+    tipo_dato: INTEGER
+    unidad: años
+    nulos: persona humana o fecha no informada
+    sentido: "-"
+
+  - nombre: CEN_CAT_TIPO_PERSONA_1M
+    bloque: B09_PERSONA
+    fuente: 24DSF
+    descripcion: Persona humana o jurídica según prefijo del CUIT
+    definicion: prefijo 20/23/24/27 = HUMANA; 30/33/34 = JURIDICA; resto = OTRO
+    tipo_dato: CATEGORICA
+    nulos: nunca
+    sentido: "?"
+
+  - nombre: CEN_FLG_ACTIVIDAD_ARCA_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    descripcion: Tiene actividad registrada en ARCA (monotributo, autónomo, empleador)
+    definicion: actividad > 0 en el padrón
+    tipo_dato: FLAG
+    nulos: CUIT no encontrado en el padrón
+    sentido: "-"
+    observaciones: Foto del padrón (20261030); para fechas de observación pasadas puede filtrar información futura. Medir PSI y poder por fecha.
+
+  - nombre: CEN_CAT_SECTOR_ACTIVIDAD_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    descripcion: Sector de la actividad principal registrada en ARCA
+    definicion: actividad agrupada a sección del nomenclador (primeros dígitos, ver Actividades_ARCA)
+    tipo_dato: CATEGORICA
+    nulos: sin actividad registrada
+    sentido: "?"
+    observaciones: Misma salvedad de foto que CEN_FLG_ACTIVIDAD_ARCA_1M.
+
+  - nombre: CEN_CAT_PROVINCIA_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    descripcion: Provincia del domicilio fiscal
+    definicion: provincia del padrón (código ARCA 00-24)
+    tipo_dato: CATEGORICA
+    nulos: CUIT no encontrado en el padrón
+    sentido: "?"
+
+  - nombre: CEN_CNT_MESES_SIT1_ININT_1M
+    bloque: B09_PERSONA
+    fuente: 1DSF + 24DSF
+    descripcion: Meses en situación 1 ininterrumpida en todas las entidades, sin tope de 24 meses
+    definicion: >
+      t - desde_sit1 si desde_sit1 <= t (1DSF del corte vigente); si el deudor tuvo situación 2+ entre
+      t y el corte, se reconstruye con el 24DSF. 0 si SIT_t >= 2.
+    tipo_dato: INTEGER
+    unidad: meses
+    nulos: ausente de la central en t
+    sentido: "-"
+    observaciones: El 43% de los deudores en situación 1 lo está desde antes de 2020.
+
+  - nombre: CEN_FLG_FALLECIDO_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    uso: exclusion
+    descripcion: Persona fallecida a la fecha de observación
+    definicion: fecha_fallecimiento <= fin del mes de observación (19010101 = sucesión sin fecha, se considera fallecido)
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+    observaciones: Se excluye de la población de modelado; 219 mil deudores con deuda vigente, 79% en situación 3+.
+
+  - nombre: CEN_FLG_CUIT_REEMPLAZADO_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    descripcion: La historia incluye un CUIT dado de baja que fue reemplazado por el actual
+    definicion: existe cuit_baja con cuit_reemplazo = CUIT y deuda informada bajo cuit_baja en t-11..t
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "?"
+
+  - nombre: CEN_CAT_SEXO_1M
+    bloque: B09_PERSONA
+    fuente: PADRON
+    uso: monitoreo
+    descripcion: Sexo registrado en ARCA
+    definicion: sexo del padrón (M, F, sin registrar)
+    tipo_dato: CATEGORICA
+    nulos: sin registrar
+    sentido: "n/a"
+    observaciones: No entra al modelo (riesgo de discriminación y regulatorio). Sólo para medir sesgos del score.
+
+  # ------------------------------------------------------------------ B10 ALERTAS
+  - nombre: CEN_FLG_ALERTA_DETERIORO_3M
+    bloque: B10_ALERTAS
+    descripcion: Pasó de situación 1 a situación 2 o peor en los últimos 3 meses
+    definicion: SIT_t >= 2 AND SIT_(t-2) = 1
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_FLG_ALERTA_CONTAGIO_3M
+    bloque: B10_ALERTAS
+    descripcion: Entró en situación 2 o peor en dos o más entidades en los últimos 3 meses
+    definicion: CEN_CNT_ENT_EMPEORA_3M >= 2 AND ENT_IRR_t >= 2
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_FLG_ALERTA_SOBREENDEUDAMIENTO_6M
+    bloque: B10_ALERTAS
+    descripcion: Deuda creciendo fuerte con relaciones nuevas
+    definicion: CEN_TEN_DEUDA_6M >= 1.5 AND CEN_CNT_ALTAS_6M >= 2
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+    observaciones: Umbrales iniciales; se calibran con el informe de poder.
+
+  - nombre: CEN_FLG_ALERTA_REFUGIO_NO_BANCARIO_6M
+    bloque: B10_ALERTAS
+    descripcion: Cerró relaciones bancarias y abrió no bancarias en los últimos 6 meses
+    definicion: bajas con BANCO o CIA_FIN >= 1 AND altas con TARJETA_NB, PNFC o FIDEICOMISO >= 1 en t-5..t
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_FLG_ALERTA_REINCIDENCIA_12M
+    bloque: B10_ALERTAS
+    descripcion: Se curó de situación 2+ y volvió a caer en los últimos 12 meses
+    definicion: secuencia SIT >= 2, luego SIT = 1, luego SIT >= 2 dentro de t-11..t
+    tipo_dato: FLAG
+    nulos: nunca
+    sentido: "+"
+
+  - nombre: CEN_CNT_ALERTAS_1M
+    bloque: B10_ALERTAS
+    descripcion: Cantidad de alertas activas
+    definicion: suma de las CEN_FLG_ALERTA_*
+    tipo_dato: INTEGER
+    unidad: alertas
+    nulos: nunca
+    sentido: "+"

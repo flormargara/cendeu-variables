@@ -142,3 +142,16 @@ def test_scoring_df_y_parquet_coinciden(modelo):
     # score más alto = menor PD
     assert a[["score", "pd"]].corr(method="spearman").iloc[0, 1] < -0.95
     assert a.en_poblacion_modelo.all()
+
+
+def test_catalogo_v2_valido():
+    from pathlib import Path
+
+    from cendeu.catalogo import cargar
+
+    cat = cargar(Path(__file__).parents[1] / "catalogo" / "variables.yaml")
+    assert cat.errores == []
+    nombres = [v["nombre"] for v in cat.variables]
+    assert all(n.startswith("CEN_") for n in nombres)
+    assert len(nombres) == len(set(nombres))
+    assert max(v["ventana_meses"] for v in cat.variables) <= 12
