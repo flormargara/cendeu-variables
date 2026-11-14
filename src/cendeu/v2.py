@@ -14,6 +14,7 @@ Flujo:
 from __future__ import annotations
 
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import catalogo as cat_mod
@@ -64,37 +65,54 @@ def _q(path) -> str:
 def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, referencias: str | Path,
                    mensual: str | Path | None = None, padron: str | Path | None = None,
                    uno_dsf: str | Path | None = None, base_ipc: int | None = None,
-                   n_buckets: int = N_BUCKETS, **kw) -> Path:
+                   n_buckets: int = N_BUCKETS, hilos: int = 6, desde: int | None = None,
+                   solo: list[int] | None = None, extras: bool = True, **kw) -> Path:
     """Escribe ``dst/deudores/periodo=P/bucket=B``, ``dst/persona/bucket=B`` y ``dst/mensual/periodo=P/bucket=B``.
 
     ``mensual``: directorio con ``periodo=P/data.parquet`` del deudores.txt convertido; esos períodos
     reemplazan al 24DSF (el 24DSF omite entidades en su primer mes).
+    Cada período se escribe bucket por bucket: un COPY particionado de un mes completo (~40 M filas)
+    no entra en 10 GB.
     """
     dst, ref = Path(dst), Path(referencias)
     dst.mkdir(parents=True, exist_ok=True)
-    with conexion(**kw) as con:
-        con.execute(f"""
-            CREATE TABLE ipc AS SELECT periodo::BIGINT periodo, ipc::DOUBLE ipc FROM read_csv('{_q(ipc_csv)}', header = true);
-            CREATE TABLE eq AS SELECT entidad_origen, entidad_destino FROM read_csv('{_q(ref / "entidades_equivalencias.csv")}', header = true);
-            CREATE TABLE ent AS SELECT entidad, tipo_agrupado, recupero FROM read_csv('{_q(ref / "entidades.csv")}', header = true);
-            CREATE VIEW d24 AS SELECT * FROM read_parquet('{_q(Path(dir_24dsf))}/*/*.parquet', hive_partitioning = true);
-        """)
-        if mensual:
-            con.execute(f"CREATE VIEW men AS SELECT * FROM read_parquet('{_q(Path(mensual))}/*/*.parquet', hive_partitioning = true)")
-            periodos_men = [r[0] for r in con.execute("SELECT DISTINCT periodo FROM men").fetchall()]
-        else:
-            con.execute("CREATE VIEW men AS SELECT NULL::BIGINT periodo WHERE false")
-            periodos_men = []
-        if padron:
-            con.execute(f"""CREATE TABLE reemp AS SELECT cuit, cuit_reemplazo FROM read_parquet('{_q(padron)}')
-                            WHERE baja = '*' AND cuit_reemplazo > 0 AND cuit_reemplazo <> cuit""")
-        else:
-            con.execute("CREATE TABLE reemp (cuit BIGINT, cuit_reemplazo BIGINT)")
+    estado: dict = {}
+
+    @contextmanager
+    def con_base():
+        # Conexión nueva por período: DuckDB no libera toda la memoria entre COPY particionados.
+        with conexion(**kw) as con:
+            con.execute(f"SET preserve_insertion_order = false; SET threads = {hilos};")
+            con.execute(f"""
+                CREATE TABLE ipc AS SELECT periodo::BIGINT periodo, ipc::DOUBLE ipc FROM read_csv('{_q(ipc_csv)}', header = true);
+                CREATE TABLE eq AS SELECT entidad_origen, entidad_destino FROM read_csv('{_q(ref / "entidades_equivalencias.csv")}', header = true);
+                CREATE TABLE ent AS SELECT entidad, tipo_agrupado, recupero FROM read_csv('{_q(ref / "entidades.csv")}', header = true);
+                CREATE VIEW d24 AS SELECT * FROM read_parquet('{_q(Path(dir_24dsf))}/*/*.parquet', hive_partitioning = true);
+            """)
+            if mensual:
+                con.execute(f"CREATE VIEW men AS SELECT * FROM read_parquet('{_q(Path(mensual))}/*/*.parquet', hive_partitioning = true)")
+                periodos_men = [r[0] for r in con.execute("SELECT DISTINCT periodo FROM men").fetchall()]
+            else:
+                con.execute("CREATE VIEW men AS SELECT NULL::BIGINT periodo WHERE false")
+                periodos_men = []
+            if padron:
+                con.execute(f"""CREATE TABLE reemp AS SELECT cuit, cuit_reemplazo FROM read_parquet('{_q(padron)}')
+                                WHERE baja = '*' AND cuit_reemplazo > 0 AND cuit_reemplazo <> cuit""")
+            else:
+                con.execute("CREATE TABLE reemp (cuit BIGINT, cuit_reemplazo BIGINT)")
+            estado["periodos_men"] = periodos_men
+            yield con
+
+    with con_base() as con:
+        periodos_men = estado["periodos_men"]
         base = base_ipc or con.execute("SELECT max(periodo) FROM ipc").fetchone()[0]
         ipc_base = con.execute("SELECT ipc FROM ipc WHERE periodo = ?", [base]).fetchone()[0]
         periodos = sorted({r[0] for r in con.execute("SELECT DISTINCT periodo FROM d24").fetchall()} | set(periodos_men))
-        for p in periodos:
-            t0 = time.time()
+    for p in periodos:
+        if (desde and p < desde) or (solo and p not in solo):  # retomar una corrida cortada
+            continue
+        t0 = time.time()
+        with con_base() as con:
             if p in periodos_men:
                 fuente = f"""SELECT entidad, cuit, periodo, CASE WHEN situacion = 11 THEN 1 ELSE situacion END AS situacion,
                                     (coalesce(prestamos, 0) + coalesce(garantias_otorgadas, 0) + coalesce(otros_conceptos, 0))::DOUBLE AS monto,
@@ -104,23 +122,29 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
                 fuente = f"""SELECT entidad, cuit, periodo, CASE WHEN situacion = 11 THEN 1 ELSE situacion END AS situacion,
                                     monto::DOUBLE AS monto, (flag IN ('1', '2'))::INT AS pj
                              FROM d24 WHERE periodo = {p} AND tipo_id = 11 AND situacion > 0"""
-            con.execute(f"""
+            for k in range(n_buckets):
+                destino = dst / "deudores" / f"periodo={p}" / f"bucket={k}"
+                destino.mkdir(parents=True, exist_ok=True)
+                con.execute(f"""
                 COPY (
                   WITH r AS ({fuente}),
                   m AS (
                     SELECT coalesce(eq.entidad_destino, r.entidad) AS entidad, coalesce(rp.cuit_reemplazo, r.cuit) AS cuit,
                            (rp.cuit IS NOT NULL)::INT AS reemplazado, r.periodo, r.situacion, r.monto, r.pj
-                    FROM r LEFT JOIN eq ON eq.entidad_origen = r.entidad LEFT JOIN reemp rp ON rp.cuit = r.cuit)
-                  SELECT m.cuit, m.entidad, m.periodo, max(m.situacion)::INTEGER AS situacion,
+                    FROM r LEFT JOIN eq ON eq.entidad_origen = r.entidad LEFT JOIN reemp rp ON rp.cuit = r.cuit
+                    WHERE coalesce(rp.cuit_reemplazo, r.cuit) % {n_buckets} = {k})
+                  SELECT m.cuit, m.entidad, max(m.situacion)::INTEGER AS situacion,
                          sum(m.monto) * {ipc_base} / any_value(i.ipc) AS monto, max(m.pj) AS pj, max(m.reemplazado) AS reemplazado,
-                         coalesce(any_value(e.tipo_agrupado), 'OTRO') AS tipo, coalesce(any_value(e.recupero), 0) AS recupero,
-                         m.cuit % {n_buckets} AS bucket
+                         coalesce(any_value(e.tipo_agrupado), 'OTRO') AS tipo, coalesce(any_value(e.recupero), 0) AS recupero
                   FROM m JOIN ipc i USING (periodo) LEFT JOIN ent e ON e.entidad = m.entidad
                   GROUP BY m.cuit, m.entidad, m.periodo
-                ) TO '{_q(dst / "deudores")}' (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (periodo, bucket), OVERWRITE_OR_IGNORE true)
-            """)
-            print(f"base {p}: {time.time() - t0:.0f}s", flush=True)
+                ) TO '{_q(destino / "data.parquet")}' (FORMAT parquet, COMPRESSION zstd)
+                """)
+        print(f"base {p}: {time.time() - t0:.0f}s", flush=True)
 
+    if not extras:
+        return dst
+    with con_base() as con:
         # Persona: padrón + 1DSF para los CUITs de la central
         con.execute(f"""CREATE TABLE cuits AS SELECT DISTINCT cuit FROM read_parquet('{_q(dst / "deudores")}/*/*/*.parquet')""")
         sel_padron = (f"""SELECT cuit, fecha_nac_contrato, sexo, provincia, actividad, fecha_fallecimiento
@@ -184,7 +208,7 @@ def _series_sql(t: int) -> str:
                count(*) FILTER (i >= 2 AND (i_prev IS NULL OR i_prev < i - 1)) AS altas
         FROM e GROUP BY ALL),
       h AS (SELECT e.cuit, e.i, sum((e.monto / a.deuda) ^ 2) AS hhi FROM e JOIN a USING (cuit, i) WHERE a.deuda > 0 GROUP BY ALL),
-      en AS (SELECT mt.cuit, mt.i, -sum((mt.monto / a.deuda) * ln(mt.monto / a.deuda)) AS entropia
+      en AS (SELECT mt.cuit, mt.i, greatest(-sum((mt.monto / a.deuda) * ln(mt.monto / a.deuda)), 0) AS entropia
              FROM mt JOIN a USING (cuit, i) WHERE a.deuda > 0 AND mt.monto > 0 GROUP BY ALL)
       SELECT a.*, h.hhi, en.entropia
       FROM a LEFT JOIN h USING (cuit, i) LEFT JOIN en USING (cuit, i);
@@ -196,23 +220,28 @@ def _series_sql(t: int) -> str:
         LEFT JOIN m ON m.cuit = pob.cuit AND m.i = k.i
         LEFT JOIN (SELECT cuit, i + 1 AS i, count(*) AS bajas FROM e WHERE i <= 12 AND (i_next IS NULL OR i_next > i + 1) GROUP BY ALL) bj
                ON bj.cuit = pob.cuit AND bj.i = k.i)
+      , r AS (   -- un solo ordenamiento por CUIT: lista de registros mensuales
+        SELECT cuit, list({{'deuda': deuda, 'deuda_irr': deuda_irr, 'deuda_mora': deuda_mora, 'sit': sit, 'sit_pond': sit_pond,
+                           'ent': ent, 'ent_irr': ent_irr, 'hhi': hhi, 'ent_princ': ent_princ, 'altas': altas,
+                           'bajas': bajas_sin_deuda, 'entropia': entropia, 'deuda_pnfc': deuda_pnfc}} ORDER BY i) AS r
+        FROM g GROUP BY cuit)
       SELECT cuit,
-        list(coalesce(deuda, 0) ORDER BY i) AS DEUDA,
-        list(coalesce(deuda_irr, 0) ORDER BY i) AS DEUDA_IRR,
-        list(coalesce(deuda_mora, 0) ORDER BY i) AS DEUDA_MORA,
-        list(coalesce(sit, 0)::INTEGER ORDER BY i) AS SIT,
-        list(sit_pond ORDER BY i) AS SIT_POND,
-        list(coalesce(ent, 0)::INTEGER ORDER BY i) AS ENT,
-        list(coalesce(ent_irr, 0)::INTEGER ORDER BY i) AS ENT_IRR,
-        list(coalesce(deuda_irr, 0) / nullif(deuda, 0) ORDER BY i) AS PCT_IRR,
-        list(hhi ORDER BY i) AS HHI,
-        list(ent_princ ORDER BY i) AS ENT_PRINC,
-        list(coalesce(altas, 0)::INTEGER ORDER BY i) AS ALTAS,
-        list(coalesce(bajas_sin_deuda, 0)::INTEGER ORDER BY i) AS BAJAS,
-        list(entropia ORDER BY i) AS ENTROPIA,
-        list(coalesce(deuda_pnfc, 0) ORDER BY i) AS DEUDA_PNFC,
-        list((deuda IS NOT NULL)::INTEGER ORDER BY i) AS PRES
-      FROM g GROUP BY cuit;
+        list_transform(r, lambda z: coalesce(z.deuda, 0)) AS DEUDA,
+        list_transform(r, lambda z: coalesce(z.deuda_irr, 0)) AS DEUDA_IRR,
+        list_transform(r, lambda z: coalesce(z.deuda_mora, 0)) AS DEUDA_MORA,
+        list_transform(r, lambda z: coalesce(z.sit, 0)::INTEGER) AS SIT,
+        list_transform(r, lambda z: z.sit_pond) AS SIT_POND,
+        list_transform(r, lambda z: coalesce(z.ent, 0)::INTEGER) AS ENT,
+        list_transform(r, lambda z: coalesce(z.ent_irr, 0)::INTEGER) AS ENT_IRR,
+        list_transform(r, lambda z: coalesce(z.deuda_irr, 0) / nullif(z.deuda, 0)) AS PCT_IRR,
+        list_transform(r, lambda z: z.hhi) AS HHI,
+        list_transform(r, lambda z: z.ent_princ) AS ENT_PRINC,
+        list_transform(r, lambda z: coalesce(z.altas, 0)::INTEGER) AS ALTAS,
+        list_transform(r, lambda z: coalesce(z.bajas, 0)::INTEGER) AS BAJAS,
+        list_transform(r, lambda z: z.entropia) AS ENTROPIA,
+        list_transform(r, lambda z: coalesce(z.deuda_pnfc, 0)) AS DEUDA_PNFC,
+        list_transform(r, lambda z: (z.deuda IS NOT NULL)::INTEGER) AS PRES
+      FROM r;
 
     CREATE OR REPLACE TEMP TABLE x AS
       SELECT cuit,
@@ -245,6 +274,8 @@ def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool) -> t
         expr = v["sql"]
         if v["fuente"] == "MENSUAL" and not mensual_disponible:
             expr = "NULL"
+        if v["tipo_dato"] in ("INTEGER", "FLAG"):
+            expr = f"({expr})::INTEGER"
         (capa2 if v.get("capa") == 2 else capa1).append(f"({expr}) AS {v['nombre']}")
     return ",\n        ".join(capa1), ",\n        ".join(capa2)
 
@@ -264,6 +295,7 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
     p_ini, p_fin = periodo_mas(obs, -(LARGO - 1)), periodo_mas(obs, desempeno)
     fin_mes = f"last_day(DATE '{obs // 100}-{obs % 100:02d}-01')"
     with conexion(**kw) as con:
+        con.execute("SET preserve_insertion_order = false;")
         con.execute(MACROS)
         con.execute(f"CREATE VIEW base AS SELECT * FROM read_parquet('{_q(base / 'deudores')}/*/*/*.parquet', hive_partitioning = true)")
         ultimo = con.execute("SELECT max(periodo) FROM base").fetchone()[0]
@@ -290,7 +322,7 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                 WHERE bucket = {k} AND periodo > {obs} AND periodo <= {p_fin} GROUP BY cuit;
                 CREATE OR REPLACE TEMP TABLE per AS
                 SELECT cuit,
-                  CASE WHEN tipo_persona(cuit) = 'HUMANA' THEN date_diff('year', fecha_nac, {fin_mes}) END AS EDAD,
+                  CASE WHEN tipo_persona(cuit) = 'HUMANA' AND date_diff('year', fecha_nac, {fin_mes}) BETWEEN 0 AND 110 THEN date_diff('year', fecha_nac, {fin_mes}) END AS EDAD,
                   CASE WHEN tipo_persona(cuit) = 'JURIDICA' THEN date_diff('year', fecha_nac, {fin_mes}) END AS ANTIG_EMPRESA,
                   CASE WHEN en_padron = 1 THEN (actividad > 0)::INT END AS ACTIVIDAD_FLG,
                   CASE WHEN actividad > 0 THEN lpad(actividad::VARCHAR, 6, '0')[1:2] END AS SECTOR,

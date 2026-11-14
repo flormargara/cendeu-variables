@@ -40,6 +40,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--ipc", required=True); p.add_argument("--referencias", default="referencias")
     p.add_argument("--mensual"); p.add_argument("--padron"); p.add_argument("--uno-dsf")
     p.add_argument("--base-ipc", type=int, help="período de los pesos constantes (default: último del IPC)")
+    p.add_argument("--desde", type=int, help="retomar desde este período (los anteriores ya están escritos)")
 
     p = sub.add_parser("variables-v2", help="v2: variables del catálogo a una o más fechas de observación")
     p.add_argument("dir_base"); p.add_argument("salida")
@@ -72,7 +73,7 @@ def main(argv: list[str] | None = None) -> None:
         scorecard.entrenar(a.variables, a.modelo_json, pct_muestra=a.pct_muestra, max_vars=a.max_vars)
     elif a.cmd == "base":
         v2.construir_base(a.dir_24dsf, a.salida, a.ipc, a.referencias, mensual=a.mensual, padron=a.padron,
-                          uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, **kw)
+                          uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, desde=a.desde, **kw)
     elif a.cmd == "variables-v2":
         for obs in a.obs:
             v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, **kw)
