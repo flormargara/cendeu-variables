@@ -1,7 +1,11 @@
-"""Fase 6 — Scorecards v2 por segmento sobre las variables del catálogo.
+"""Fase 6 — Validación multivariada de las variables v2.
 
-Mismo método que la v1 (``cendeu.scorecard``): binning monótono, WoE, selección forward por ganancia de
-AUC con filtros de correlación y de signo, y regresión logística. Lo nuevo:
+Este repo construye variables; los modelos de PD se hacen en otro proyecto. Acá se ajusta un scorecard
+sólo como prueba de las variables: si juntas suman poder, si ese poder se sostiene fuera de muestra y si
+superan a las variables v1. No es un modelo para producción (no se calibra ni se publica).
+
+Método de la v1 (``cendeu.scorecard``): binning monótono, WoE, selección forward por ganancia de AUC con
+filtros de correlación y de signo, y regresión logística. Además:
 
 - Un modelo por segmento: situación 1 y situación 2 en el mes de observación (tasas de target de ~6% y
   ~75%: son poblaciones distintas).
@@ -9,7 +13,8 @@ AUC con filtros de correlación y de signo, y regresión logística. Lo nuevo:
   queda afuera del desarrollo: ahí faltan las variables de 12 meses que necesitan el mes previo.
 - Muestra fija por hash del CUIT (la misma en todas las fechas), configurable por segmento.
 
-El JSON resultante usa el mismo formato que la v1, así que ``cendeu.scoring`` lo aplica tal cual.
+El ajuste se guarda en el formato JSON de la v1 (``cendeu.scoring`` lo aplica) para poder compararlo con el
+scorecard v1 sobre las mismas personas.
 """
 from __future__ import annotations
 
@@ -150,13 +155,10 @@ def entrenar_segmento(df: pd.DataFrame, nombre: str, filtro: str, *, fechas_dev=
     por_fecha = [{"obs": int(f), "muestra": "desarrollo" if f in fechas_dev else "fuera de muestra",
                   **met(df.obs.to_numpy() == f), "psi_score": psi(df.obs.to_numpy() == f)}
                  for f in sorted(set(fechas_dev) | set(fechas_oot))]
-    # calibración por decil de score en fuera de muestra
-    dec = pd.qcut(pd.Series(score[oot]), 10, labels=False, duplicates="drop")
-    calib = (pd.DataFrame({"decil": dec.to_numpy(), "y": y[oot], "p": p[oot]}).groupby("decil")
-             .agg(n=("y", "size"), tasa_observada=("y", "mean"), pd_media=("p", "mean")).reset_index())
 
     return {
-        "version": "2.0.0",
+        "version": "validacion-v2",
+        "uso": "validación de variables; no es un modelo para producción",
         "creado": dt.datetime.now().isoformat(timespec="seconds"),
         "segmento": nombre,
         "fuente": {"variables": "variables v2 (catalogo/variables.yaml)", "fechas_desarrollo": list(fechas_dev),
@@ -168,8 +170,7 @@ def entrenar_segmento(df: pd.DataFrame, nombre: str, filtro: str, *, fechas_dev=
                    "offset": round(float(offset), 6)},
         "intercepto": round(b0, 6),
         "variables": variables_json,
-        "metricas": {"train": met(train), "test": met(test), "oot": met(oot), "por_fecha": por_fecha,
-                     "calibracion_oot": calib.round(5).to_dict(orient="records")},
+        "metricas": {"train": met(train), "test": met(test), "oot": met(oot), "por_fecha": por_fecha},
         "seleccion": traza,
         "iv_todas": {c: round(b.iv, 4) for c, b in sorted(bins.items(), key=lambda t: -t[1].iv)},
     }
@@ -177,8 +178,8 @@ def entrenar_segmento(df: pd.DataFrame, nombre: str, filtro: str, *, fechas_dev=
 
 def comparar_v1(dir_vars: str | Path, vars_v1: str | Path, modelo_v1: str | Path, modelo_v2: dict,
                 obs: int = 202509, pct: int = 3, pct_test: int = 30) -> dict:
-    """Gini de v1 y v2 en ``obs`` sobre la población común (humanas en situación 1), en los CUITs que el v2
-    no usó para entrenar (sus fechas de desarrollo no incluyen ``obs``). La v1 sí se entrenó en ``obs``."""
+    """Gini de v1 y v2 en ``obs`` sobre la población común (humanas en situación 1). El ajuste v2 nunca usa
+    ``obs`` si está fuera de sus fechas de desarrollo; la v1 se entrenó en 202509 con target a 12 meses."""
     from .scoring import cargar_modelo, sql_score
 
     con = duckdb.connect()
@@ -195,12 +196,13 @@ def comparar_v1(dir_vars: str | Path, vars_v1: str | Path, modelo_v1: str | Path
     if df.empty or df.y.nunique() < 2:
         return {}
     g = lambda col: round(2 * roc_auc_score(df.y, df[col]) - 1, 4)
-    return {"obs": obs, "n": len(df), "tasa": round(float(df.y.mean()), 5), "gini_v1": g("pd_v1"), "gini_v2": g("pd_v2"),
+    return {"obs": obs, "fuera_de_muestra_para_v1": obs != 202509, "n": len(df), "tasa": round(float(df.y.mean()), 5), "gini_v1": g("pd_v1"), "gini_v2": g("pd_v2"),
             "ks_v1": round(_ks(df.y.to_numpy(), df.pd_v1.to_numpy()), 4), "ks_v2": round(_ks(df.y.to_numpy(), df.pd_v2.to_numpy()), 4)}
 
 
-def entrenar_todos(dir_vars: str | Path, catalogo: str | Path, dst_dir: str | Path, *,
-                   vars_v1: str | Path | None = None, modelo_v1: str | Path | None = None, log=print) -> dict:
+def validar(dir_vars: str | Path, catalogo: str | Path, dst_dir: str | Path, *,
+            vars_v1: dict[int, str | Path] | None = None, modelo_v1: str | Path | None = None, log=print) -> dict:
+    """``vars_v1``: {fecha de observación: Parquet de variables v1 con target a 6 meses} para comparar v1 y v2."""
     cat = cat_mod.cargar(catalogo)
     target = cat.meta["targets"][0]["nombre"]
     cands = candidatas(catalogo)
@@ -213,8 +215,9 @@ def entrenar_todos(dir_vars: str | Path, catalogo: str | Path, dst_dir: str | Pa
         modelo["fuente"]["pct_muestra"] = seg["pct_muestra"]
         del df
         if nombre == "sit1" and vars_v1 and modelo_v1:
-            modelo["comparacion_v1"] = comparar_v1(dir_vars, vars_v1, modelo_v1, modelo)
-        (dst / f"scorecard_cen_v2_{nombre}.json").write_text(json.dumps(modelo, ensure_ascii=False, indent=2), encoding="utf-8")
+            modelo["comparacion_v1"] = [comparar_v1(dir_vars, ruta, modelo_v1, modelo, obs=int(obs))
+                                        for obs, ruta in sorted(vars_v1.items())]
+        (dst / f"ajuste_{nombre}.json").write_text(json.dumps(modelo, ensure_ascii=False, indent=2), encoding="utf-8")
         m = modelo["metricas"]
         log(f"[{nombre}] {len(modelo['variables'])} variables | Gini test {m['test'].get('gini')} | oot {m['oot'].get('gini')} | KS oot {m['oot'].get('ks')}")
         resultados[nombre] = modelo

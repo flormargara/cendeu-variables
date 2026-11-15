@@ -1,10 +1,10 @@
 # cendeu-variables
 
-Variables de comportamiento crediticio y scorecards a partir de la **Central de Deudores del Sistema Financiero (BCRA)**: el bianual `24DSF` (24 meses de historia de todos los deudores del país), el `deudores.txt` mensual, el 1DSF, el maestro de entidades y el padrón de ARCA.
+Variables de comportamiento crediticio a partir de la **Central de Deudores del Sistema Financiero (BCRA)**: el bianual `24DSF` (24 meses de historia de todos los deudores del país), el `deudores.txt` mensual, el 1DSF, el maestro de entidades y el padrón de ARCA.
 
-Se usa como **paquete Python** o por **CLI** (`cendeu <comando>`) en un batch mensual. Todo el procesamiento pesado corre en DuckDB. El plan, las decisiones y los pendientes están en [PLAN.md](PLAN.md).
+El repo construye, documenta y valida las variables; los modelos que las usan (por ejemplo, un modelo de PD) se desarrollan en otros proyectos. Se usa como **paquete Python** o por **CLI** (`cendeu <comando>`) en un batch mensual. Todo el procesamiento pesado corre en DuckDB. El plan, las decisiones y los pendientes están en [PLAN.md](PLAN.md).
 
-> ⚠️ **Los datos no se versionan.** La base contiene datos personales (Ley 25.326). El `.gitignore` excluye `*.txt`, `*.7z`, `*.parquet` y `data/`. En el repo hay código, catálogo, documentación, modelos (parámetros y conteos por bin) y reportes agregados. Los datos viven en `s3://data-cendeu-raw` (layout en [PLAN.md](PLAN.md#layout-s3)).
+> ⚠️ **Los datos no se versionan.** La base contiene datos personales (Ley 25.326). El `.gitignore` excluye `*.txt`, `*.7z`, `*.parquet` y `data/`. En el repo hay código, catálogo, documentación y reportes agregados. Los datos viven en `s3://data-cendeu-raw` (layout en [PLAN.md](PLAN.md#layout-s3)).
 
 ## Instalación
 
@@ -21,12 +21,12 @@ Requiere Python ≥ 3.10. Para descomprimir los archivos del BCRA hace falta `7z
 | Carpeta | Contenido |
 |---|---|
 | [`catalogo/variables.yaml`](catalogo/variables.yaml) | Fuente única de las variables v2: nombre, definición, fuente, nulos, uso y expresión SQL de cada una |
-| [`src/cendeu/`](src/cendeu/) | Paquete: `v2.py` (base y variables), `catalogo.py` (carga, validación y documentación), `poder.py` (informe de poder), `s3.py` (subida), `pipeline.py`, `scorecard.py` y `scoring.py` (v1) |
+| [`src/cendeu/`](src/cendeu/) | Paquete: `v2.py` (base y variables), `catalogo.py` (carga, validación y documentación), `poder.py` (informe de poder), `validacion_v2.py` (validación multivariada), `s3.py` (subida), `pipeline.py`, `scorecard.py` y `scoring.py` (v1) |
 | [`referencias/`](referencias/) | Datos públicos versionados: IPC INDEC, tipo de entidad, fideicomisos de recupero y equivalencias por fusiones |
 | [`docs/`](docs/) | Documento técnico y diccionario de variables (generados desde el catálogo) y el informe de variables mix |
-| [`reportes/`](reportes/) | Estudio del 24DSF, fuentes BCRA y ARCA, informe de poder v2 y su página |
+| [`reportes/`](reportes/) | Estudio del 24DSF, fuentes BCRA y ARCA, informe de poder v2 y su página, validación multivariada |
 | [`estudios/`](estudios/) | Scripts de estudio y el conversor de los paquetes mensuales |
-| [`modelos/`](modelos/) | Scorecards en JSON |
+| [`modelos/`](modelos/) | Scorecard v1 (línea de base para comparar) |
 | [`infra/`](infra/) | Política IAM del bucket |
 
 ## Flujo v2
@@ -62,6 +62,9 @@ cendeu variables-v2 data/v2/base data/v2/variables --obs 202509 202510 202511 20
 cendeu poder data/v2/variables --vars-v1 data/vars_cendeu_202509.parquet
 cendeu pagina-poder          # CSV de la página del informe
 
+# Validación multivariada: ajuste por segmento, fuera de muestra y comparación con las variables v1
+cendeu validar-v2 data/v2/variables --vars-v1 202509=data/vars_cendeu_202509.parquet 202603=data/vars_cendeu_202603_d6.parquet
+
 # Catálogo: validar y regenerar la documentación
 cendeu catalogo
 cendeu documentar
@@ -79,6 +82,7 @@ Cada base guarda en `_meta.json` el hash del IPC y de las referencias que usó, 
 
 - **Variables**: `variables/periodo_obs=AAAAMM/parte_XX.parquet`, una fila por CUIT presente en la central en esa fecha. Columnas: `CUIT`, `PERIODO_OBS`, `EN_POBLACION` (situación ≤ 2, no fallecido), `CEN_TGT_SIT3P_6M` (nulo si el desempeño no está completo) y las 149 variables `CEN_*`.
 - **Documentación**: [`docs/variables.md`](docs/variables.md) y [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv).
+- **Validación multivariada**: [`reportes/validacion_v2/`](reportes/validacion_v2/). Un scorecard por segmento (situación 1 y 2) ajustado sólo para probar las variables en conjunto: poder fuera de muestra, estabilidad y comparación con las variables v1. No es un modelo para producción.
 - **Informe de poder**: [`reportes/poder_v2/`](reportes/poder_v2/) y su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/), publicada como artifact en claude.ai. Para actualizar la página después de recalcular el informe, se corre `cendeu pagina-poder` y se reemplazan los tres CSV en el panel de fuentes; el HTML no cambia.
 
 ### Agregar o cambiar una variable
@@ -92,7 +96,7 @@ Reglas que aplica el generador: una variable con `disponible_desde` posterior a 
 
 ## v1 (línea de base)
 
-El flujo y el scorecard originales siguen disponibles como referencia hasta que exista el scorecard v2.
+Las variables y el scorecard originales se mantienen sólo como referencia para medir cuánto mejoran las variables v2. Cuando exista el proyecto de modelos, el scorecard y el scoring v1 pasan a ese proyecto.
 
 ```bash
 cendeu variables data/deudores_24m data/vars_202609.parquet --obs 202609 --ipc referencias/ipc.csv

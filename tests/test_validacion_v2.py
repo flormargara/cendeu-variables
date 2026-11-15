@@ -1,18 +1,18 @@
-"""Scorecard v2 por segmento con datos sintéticos."""
+"""Validación multivariada v2 con datos sintéticos."""
 from __future__ import annotations
 
 import duckdb
 import numpy as np
 import pandas as pd
 
-from cendeu import scorecard_v2
+from cendeu import validacion_v2
 from cendeu.scoring import sql_score
 
 
 def _datos(n=40_000, seed=3):
     rng = np.random.default_rng(seed)
     filas = []
-    for obs in scorecard_v2.DESARROLLO + scorecard_v2.OOT:
+    for obs in validacion_v2.DESARROLLO + validacion_v2.OOT:
         x = rng.normal(size=n)
         ruido = rng.normal(size=n)
         y = (rng.random(n) < 1 / (1 + np.exp(-(-2.5 + 1.2 * x)))).astype(int)
@@ -23,7 +23,7 @@ def _datos(n=40_000, seed=3):
 
 def test_entrenar_segmento_y_aplicar():
     df = _datos()
-    m = scorecard_v2.entrenar_segmento(df, "sit1", "CEN_MAX_SIT_1M = 1", log=lambda *_: None)
+    m = validacion_v2.entrenar_segmento(df, "sit1", "CEN_MAX_SIT_1M = 1", log=lambda *_: None)
     assert [v["nombre"] for v in m["variables"]] == ["CEN_VAL_SENAL_1M"]
     assert m["metricas"]["oot"]["gini"] > 0.45 and m["metricas"]["test"]["gini"] > 0.45
     assert all(f["psi_score"] < 0.05 for f in m["metricas"]["por_fecha"])

@@ -1,6 +1,6 @@
 # Plan v2 — Variables CENDEU
 
-Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA, archivo `24DSF`), siguiendo el enfoque del Feature Store CRC: variables diseñadas por dominio de riesgo (no por disponibilidad), dinámica temporal (VAR, TEN, FMX, RSI), documentación completa y medición de poder antes de usarlas.
+Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA, archivo `24DSF`). El repo es sólo de variables: los modelos de PD que las usen van en otros proyectos. Se sigue el enfoque del Feature Store CRC: variables diseñadas por dominio de riesgo (no por disponibilidad), dinámica temporal (VAR, TEN, FMX, RSI), documentación completa y medición de poder antes de usarlas.
 
 ## Decisiones tomadas
 
@@ -47,15 +47,15 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho |
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | [`docs/variables_mix.md`](docs/variables_mix.md) | hecho (diseño; implementar cuando haya datos propios) |
 | 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | [`reportes/poder_v2/`](reportes/poder_v2/) (`cendeu poder`) y su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/), publicada como artifact en claude.ai | hecho: 99 de 139 variables con IV ≥ 0,1, 60 grupos no redundantes, PSI máximo 0,034 |
-| 6 | Selección y nuevo scorecard | `modelos/` | pendiente |
+| 6 | Validación multivariada de las variables (ajuste por segmento sólo como prueba, no como modelo) | [`reportes/validacion_v2/`](reportes/validacion_v2/) (`cendeu validar-v2`) | hecho |
 
-## Resultados de la Fase 5 y decisiones para la Fase 6
+## Resultados de la Fase 5
 
 - **Poder**: calidad, momentum y transiciones concentran el poder (IV máximos 1,5–1,7); velocidad, relación con el sistema y mix por tipo aportan menos IV pero más información distinta (más grupos no redundantes). Todas las variables son estables entre fechas (PSI < 0,04) y su Gini fuera de muestra es igual o mayor al de desarrollo.
 - **Incremental vs v1** (Gini v1 0,586 en 202509, humanas en situación 1): la mejor variable sola suma +0,009 (edad), seguida de variación de deuda y RSI de deuda (+0,005). La v1 se entrenó con esa fecha, así que la ganancia está subestimada; el aporte real se mide en el modelo multivariado.
-- **Segmentar**: la población incluye situación 2, y muchas variables de magnitud y calidad se reducen a "está en situación 2 ahora". Modelar por separado situación 1 y situación 2.
+- **Segmentar**: la población incluye situación 2, y muchas variables de magnitud y calidad se reducen a "está en situación 2 ahora". Para usarlas en un modelo conviene separar situación 1 y situación 2.
 - **Signos esperados** a corregir en el catálogo: rolls de 2 a 3, meses de mejora, bajas, CV de deuda, huecos y reactivación tienen el signo opuesto al planteado.
-- **Validación**: entrenar con 202509–202601 y validar fuera de muestra con 202602–202603.
+- **Validación multivariada (Fase 6)**: ver [`reportes/validacion_v2/`](reportes/validacion_v2/).
 
 ## Lecciones de la implementación
 
@@ -68,8 +68,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 - Subir a S3 la base v2 y las variables de las 7 fechas (prefijo a definir para la base, p. ej. `base_v2/`).
 - Modo muestra para desarrollo en `cendeu variables-v2`.
-- Fase 6: segmentos, selección por grupo, scorecard v2 y comparación contra v1.
-- Al tener v2: borrar de S3 variables y scores v1 (*fresh start*, con confirmación).
+- Borrar de S3 variables y scores v1 (*fresh start*, con confirmación).
+- Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
 - Limpiar los archivos sueltos sin versionar de la raíz (copias viejas de la v1).
 - Merge de `v2/estudio-datos` en `main`.
 
