@@ -303,7 +303,8 @@ def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool) -> t
 
 
 def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalogo: str | Path,
-                        desempeno: int = 6, n_buckets: int = N_BUCKETS, buckets: list[int] | None = None, **kw) -> Path:
+                        desempeno: int = 6, n_buckets: int = N_BUCKETS, buckets: list[int] | None = None,
+                        retomar: bool = False, **kw) -> Path:
     """Variables v2 a la fecha ``obs`` para todos los CUITs presentes en ``obs``.
 
     Escribe ``dst/periodo_obs=AAAAMM/parte_BB.parquet``. Columnas: CUIT, PERIODO_OBS, EN_POBLACION,
@@ -327,6 +328,10 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
         capa1, capa2 = _variables_sql(cat, obs, hay_mensual)
         target = cat.meta["targets"][0]["nombre"]
         for k in buckets if buckets is not None else range(n_buckets):
+            parte = out / f"parte_{k:02d}.parquet"
+            if retomar and parte.exists():
+                continue
+            tmp_parte = out / f".parte_{k:02d}.tmp"
             t0 = time.time()
             con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE b AS
@@ -378,8 +383,9 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                       {capa1}
                     FROM s JOIN x2 x USING (cuit) LEFT JOIN per USING (cuit) LEFT JOIN mm USING (cuit) LEFT JOIN tgt USING (cuit))
                   SELECT *{(", " + capa2) if capa2 else ""} FROM v1
-                ) TO '{_q(out / f"parte_{k:02d}.parquet")}' (FORMAT parquet, COMPRESSION zstd)
+                ) TO '{_q(tmp_parte)}' (FORMAT parquet, COMPRESSION zstd)
             """)
+            tmp_parte.rename(parte)  # una parte sólo existe si se escribió completa
             n = con.execute("SELECT count(*) FROM s").fetchone()[0]
             print(f"obs {obs} bucket {k:02d}: {n:,} CUITs, {time.time() - t0:.0f}s", flush=True)
     return out

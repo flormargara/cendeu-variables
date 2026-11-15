@@ -47,6 +47,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--obs", type=int, nargs="+", required=True)
     p.add_argument("--catalogo", default="catalogo/variables.yaml")
     p.add_argument("--buckets", type=int, nargs="*", help="sólo estos buckets (prueba)")
+    p.add_argument("--retomar", action="store_true", help="saltea las partes ya escritas")
 
     p = sub.add_parser("catalogo", help="v2: valida el catálogo y muestra el conteo por bloque")
     p.add_argument("--catalogo", default="catalogo/variables.yaml")
@@ -87,7 +88,7 @@ def main(argv: list[str] | None = None) -> None:
                           uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, desde=a.desde, **kw)
     elif a.cmd == "variables-v2":
         for obs in a.obs:
-            v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, **kw)
+            v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, retomar=a.retomar, **kw)
     elif a.cmd == "documentar":
         from pathlib import Path
         from . import catalogo
