@@ -111,7 +111,7 @@ observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deud
 | [B06_RELACION_SISTEMA](#b06_relacion_sistema) | Con cuántas y cuáles entidades opera, altas, bajas, principalidad, concentración | 21 | modelo: 21 |
 | [B07_MIX_ENTIDADES](#b07_mix_entidades) | Con qué tipo de entidades se endeuda | 16 | modelo: 16 |
 | [B08_FOTO_MENSUAL](#b08_foto_mensual) | Campos que sólo trae el mensual (atraso, refinanciación, garante) | 7 | futuro: 7 |
-| [B09_PERSONA](#b09_persona) | Atributos de la persona (padrón, 1DSF) | 10 | exclusion: 1, modelo: 8, monitoreo: 1 |
+| [B09_PERSONA](#b09_persona) | Atributos de la persona (padrón, 1DSF) | 10 | exclusion: 1, futuro: 1, modelo: 7, monitoreo: 1 |
 | [B10_ALERTAS](#b10_alertas) | Combinaciones de señales tempranas | 6 | modelo: 6 |
 
 `uso`: **modelo** = candidata al score; **futuro** = sólo existe desde 202609 (mensual), entra cuando haya historia acumulada; **monitoreo** = no entra al score, sirve para medir sesgos; **exclusion** = define la población.
@@ -354,7 +354,7 @@ Notas:
 | `CEN_FLG_ACTIVIDAD_ARCA_1M` | Tiene actividad registrada en ARCA (monotributo, autónomo, empleador) | actividad > 0 en el padrón | CUIT no encontrado en el padrón | - | modelo |
 | `CEN_CAT_SECTOR_ACTIVIDAD_1M` | Sector de la actividad principal registrada en ARCA | actividad agrupada a sección del nomenclador (primeros dígitos, ver Actividades_ARCA) | sin actividad registrada | ? | modelo |
 | `CEN_CAT_PROVINCIA_1M` | Provincia del domicilio fiscal | provincia del padrón (código ARCA 00-24) | CUIT no encontrado en el padrón | ? | modelo |
-| `CEN_CNT_MESES_SIT1_ININT_1M` | Meses en situación 1 ininterrumpida en todas las entidades, sin tope de 24 meses | t - desde_sit1 si desde_sit1 <= t (1DSF del corte vigente); si el deudor tuvo situación 2+ entre t y el corte, se reconstruye con el 24DSF. 0 si SIT_t >= 2. | ausente de la central en t | - | modelo |
+| `CEN_CNT_MESES_SIT1_ININT_1M` | Meses en situación 1 ininterrumpida en todas las entidades, sin tope de 24 meses | Sólo en la fecha del corte del 1DSF: 0 si SIT_t >= 2; si tuvo situación 2+ dentro del 24DSF, meses desde esa última vez; si no, t - desde_sit1 (1DSF); si no figura en el 1DSF, meses de historia disponibles. | fechas de observación anteriores al corte del 1DSF | - | futuro |
 | `CEN_FLG_FALLECIDO_1M` | Persona fallecida a la fecha de observación | fecha_fallecimiento <= fin del mes de observación (19010101 = sucesión sin fecha, se considera fallecido) | nunca | + | exclusion |
 | `CEN_FLG_CUIT_REEMPLAZADO_1M` | La historia incluye un CUIT dado de baja que fue reemplazado por el actual | existe cuit_baja con cuit_reemplazo = CUIT y deuda informada bajo cuit_baja en t-11..t | nunca | ? | modelo |
 | `CEN_CAT_SEXO_1M` | Sexo registrado en ARCA | sexo del padrón (M, F, sin registrar) | sin registrar | n/a | monitoreo |
@@ -362,7 +362,7 @@ Notas:
 Notas:
 - `CEN_FLG_ACTIVIDAD_ARCA_1M`: Foto del padrón (20261030); para fechas de observación pasadas puede filtrar información futura. Medir PSI y poder por fecha.
 - `CEN_CAT_SECTOR_ACTIVIDAD_1M`: Misma salvedad de foto que CEN_FLG_ACTIVIDAD_ARCA_1M.
-- `CEN_CNT_MESES_SIT1_ININT_1M`: El 43% de los deudores en situación 1 lo está desde antes de 2020.
+- `CEN_CNT_MESES_SIT1_ININT_1M`: El 1DSF es una foto del corte (202609). En fechas de observación anteriores filtra el desempeño (quien cae en situación 3+ después de t ya no figura), por eso sólo se calcula en la fecha del propio corte. Para desarrollo se usa CEN_CNT_RACHA_SIT1_1M. Entra al modelo cuando haya 1DSF archivados por mes.
 - `CEN_FLG_FALLECIDO_1M`: Se excluye de la población de modelado; 219 mil deudores con deuda vigente, 79% en situación 3+.
 - `CEN_CAT_SEXO_1M`: No entra al modelo (riesgo de discriminación y regulatorio). Sólo para medir sesgos del score.
 

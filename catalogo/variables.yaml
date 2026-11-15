@@ -331,6 +331,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RAT_CURA_12M
+    requiere_mes_previo: true
     sql: "len(list_filter(pares(s.SIT, 2), lambda p: p.a >= 2 AND p.b = 1)) / nullif(len(list_filter(pares(s.SIT, 2), lambda p: p.a >= 2)), 0)"
     bloque: B03_TRANSICIONES
     descripcion: Tasa de cura individual, salidas de situación 2+ a situación 1 sobre meses en situación 2+
@@ -340,6 +341,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RAT_ROLL_2A3_12M
+    requiere_mes_previo: true
     sql: "len(list_filter(pares(s.SIT, 2), lambda p: p.a = 2 AND p.b >= 3)) / nullif(len(list_filter(pares(s.SIT, 2), lambda p: p.a = 2)), 0)"
     bloque: B03_TRANSICIONES
     descripcion: Tasa de roll individual de situación 2 a 3 o peor
@@ -381,6 +383,7 @@ variables:
     observaciones: Versión sin tope en CEN_CNT_MESES_SIT1_ININT_1M (bloque persona, desde 1DSF).
 
   - nombre: CEN_MAX_SALTO_SIT_12M
+    requiere_mes_previo: true
     sql: "coalesce(list_max(list_transform(list_filter(pares(s.SIT, 2), lambda p: p.a >= 1), lambda p: greatest(p.b - p.a, 0))), 0)"
     bloque: B03_TRANSICIONES
     descripcion: Mayor empeoramiento de situación entre dos meses consecutivos
@@ -391,6 +394,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_FLG_ENTRADA_SIT4P_12M
+    requiere_mes_previo: true
     sql: "x.ENTRADA_SIT4_12"
     bloque: B03_TRANSICIONES
     descripcion: Alguna relación nueva con una entidad que aparece directamente en situación 4 o peor
@@ -525,6 +529,7 @@ variables:
     sentido: "+"
 
   - nombre: CEN_CNT_ALTAS_{v}M
+    requiere_mes_previo: true
     sql: "list_sum(ven(s.ALTAS, {v}))"
     expandir: {v: [3, 6, 12]}
     bloque: B06_RELACION_SISTEMA
@@ -537,6 +542,7 @@ variables:
     observaciones: Requiere un mes previo a la ventana; con equivalencias aplicadas.
 
   - nombre: CEN_CNT_BAJAS_{v}M
+    requiere_mes_previo: true
     sql: "list_sum(ven(s.BAJAS, {v}))"
     expandir: {v: [3, 6, 12]}
     bloque: B06_RELACION_SISTEMA
@@ -548,6 +554,7 @@ variables:
     sentido: "-"
 
   - nombre: CEN_RCM_ULTIMA_ALTA_12M
+    requiere_mes_previo: true
     sql: "rcm(list_transform(ven(s.ALTAS, 12), lambda z: z > 0))"
     bloque: B06_RELACION_SISTEMA
     descripcion: Meses desde la última relación nueva
@@ -619,6 +626,7 @@ variables:
     observaciones: Truncada a 12 meses por la historia disponible; complementa CEN_CNT_MESES_SIT1_ININT_1M.
 
   - nombre: CEN_FLG_REACTIVACION_12M
+    requiere_mes_previo: true
     sql: "regexp_matches(bits(s.PRES, 1), '10{3,}1')::INT"
     bloque: B06_RELACION_SISTEMA
     descripcion: Volvió a la central después de 3 o más meses ausente
@@ -841,16 +849,18 @@ variables:
   - nombre: CEN_CNT_MESES_SIT1_ININT_1M
     sql: "x.MESES_SIT1_ININT"
     bloque: B09_PERSONA
+    disponible_desde: 202609
+    uso: futuro
     fuente: 1DSF + 24DSF
     descripcion: Meses en situación 1 ininterrumpida en todas las entidades, sin tope de 24 meses
     definicion: >
-      t - desde_sit1 si desde_sit1 <= t (1DSF del corte vigente); si el deudor tuvo situación 2+ entre
-      t y el corte, se reconstruye con el 24DSF. 0 si SIT_t >= 2.
+      Sólo en la fecha del corte del 1DSF: 0 si SIT_t >= 2; si tuvo situación 2+ dentro del 24DSF, meses desde
+      esa última vez; si no, t - desde_sit1 (1DSF); si no figura en el 1DSF, meses de historia disponibles.
     tipo_dato: INTEGER
     unidad: meses
-    nulos: ausente de la central en t
+    nulos: fechas de observación anteriores al corte del 1DSF
     sentido: "-"
-    observaciones: El 43% de los deudores en situación 1 lo está desde antes de 2020.
+    observaciones: El 1DSF es una foto del corte (202609). En fechas de observación anteriores filtra el desempeño (quien cae en situación 3+ después de t ya no figura), por eso sólo se calcula en la fecha del propio corte. Para desarrollo se usa CEN_CNT_RACHA_SIT1_1M. Entra al modelo cuando haya 1DSF archivados por mes.
 
   - nombre: CEN_FLG_FALLECIDO_1M
     sql: "per.FALLECIDO"

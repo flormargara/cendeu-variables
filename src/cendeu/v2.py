@@ -290,11 +290,22 @@ def _series_sql(t: int) -> str:
     """
 
 
-def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool) -> tuple[str, str]:
+def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool, primero: int) -> tuple[str, str]:
+    """Expresiones del catálogo. Quedan nulas, en vez de dar un valor sesgado:
+    - las variables con ``disponible_desde`` posterior a t (p. ej. fotos de 202609: usarlas en fechas
+      anteriores filtra información del desempeño);
+    - las que necesitan el mes previo a su ventana (``requiere_mes_previo``) cuando ese mes es anterior
+      al inicio de la historia;
+    - las del mensual si no hay mensual para t.
+    """
     capa1, capa2 = [], []
     for v in cat.variables:
         expr = v["sql"]
         if v["fuente"] == "MENSUAL" and not mensual_disponible:
+            expr = "NULL"
+        if t < int(v.get("disponible_desde") or 0):
+            expr = "NULL"
+        if v.get("requiere_mes_previo") and periodo_mas(t, -v["ventana_meses"]) < primero:
             expr = "NULL"
         if v["tipo_dato"] in ("INTEGER", "FLAG"):
             expr = f"({expr})::INTEGER"
@@ -325,7 +336,7 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
         primero = con.execute("SELECT min(periodo) FROM base").fetchone()[0]
         mensual_dir = base / "mensual" / f"periodo={obs}"
         hay_mensual = mensual_dir.exists()
-        capa1, capa2 = _variables_sql(cat, obs, hay_mensual)
+        capa1, capa2 = _variables_sql(cat, obs, hay_mensual, primero)
         target = cat.meta["targets"][0]["nombre"]
         for k in buckets if buckets is not None else range(n_buckets):
             parte = out / f"parte_{k:02d}.parquet"

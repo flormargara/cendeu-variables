@@ -73,13 +73,14 @@ def resultado(tmp_path_factory):
     cat = RAIZ / "catalogo" / "variables.yaml"
     out = v2.construir_variables(base, OBS, tmp / "vars", cat, n_buckets=2, memory_limit="1GB")
     out9 = v2.construir_variables(base, 202609, tmp / "vars", cat, n_buckets=2, memory_limit="1GB")
+    out0 = v2.construir_variables(base, 202509, tmp / "vars", cat, n_buckets=2, memory_limit="1GB")
     leer = lambda d: con.execute(f"SELECT * FROM read_parquet('{d}/*.parquet')").df().set_index("CUIT")
-    return leer(out), leer(out9)
+    return leer(out), leer(out9), leer(out0)
 
 
 def test_todas_las_variables_del_catalogo(resultado):
     from cendeu.catalogo import cargar
-    r, _ = resultado
+    r = resultado[0]
     nombres = [v["nombre"] for v in cargar(RAIZ / "catalogo" / "variables.yaml").variables]
     assert set(nombres) <= set(r.columns)
     assert set(r.index) == {A, B, C, D, E_NUEVO}   # E_VIEJO quedó unificado en E_NUEVO
@@ -93,7 +94,7 @@ def test_calidad_y_transiciones(resultado):
     assert a.CEN_RAT_CURA_12M == pytest.approx(1 / 3)
     assert a.CEN_RAT_ROLL_2A3_12M == pytest.approx(0.5)
     assert a.CEN_MAX_RACHA_SIT2P_12M == 3 and a.CEN_CNT_RACHA_SIT2P_1M == 0 and a.CEN_CNT_RACHA_SIT1_1M == 3
-    assert a.CEN_CNT_MESES_SIT1_ININT_1M == 3
+    assert pd.isna(a.CEN_CNT_MESES_SIT1_ININT_1M)        # foto del 1DSF (202609): nula antes del corte
     assert a.CEN_FLG_ALERTA_REINCIDENCIA_12M == 0
     assert a.CEN_MOD_SIT_12M == 1
 
@@ -111,7 +112,7 @@ def test_magnitud_velocidad_mix(resultado):
 
 
 def test_target_y_poblacion(resultado):
-    r, r9 = resultado
+    r, r9, _ = resultado
     assert r.loc[A, "CEN_TGT_SIT3P_6M"] == 1 and r.loc[B, "CEN_TGT_SIT3P_6M"] == 0
     assert r.loc[D, "EN_POBLACION"] == 0 and r.loc[D, "CEN_FLG_FALLECIDO_1M"] == 1
     assert r.loc[A, "EN_POBLACION"] == 1
@@ -122,7 +123,7 @@ def test_fusion_sin_altas_ni_bajas(resultado):
     b = resultado[0].loc[B]
     assert b.CEN_CNT_ALTAS_12M == 0 and b.CEN_CNT_BAJAS_12M == 0
     assert b.CEN_CNT_ENT_DISTINTAS_12M == 1 and b.CEN_CNT_CAMBIO_PRINC_12M == 0
-    assert b.CEN_CNT_MESES_SIT1_ININT_1M == (2026 - 2010) * 12 + 2   # desde 1DSF (201001), sin tope
+    assert pd.isna(b.CEN_CNT_MESES_SIT1_ININT_1M)
 
 
 def test_huecos_y_reactivacion(resultado):
@@ -139,7 +140,20 @@ def test_cuit_reemplazado(resultado):
 
 
 def test_mensual_completa_ultimo_mes(resultado):
-    r, r9 = resultado
+    r, r9, _ = resultado
     assert r9.loc[A, "CEN_CNT_ENT_1M"] == 2                 # la fila de PNFC viene sólo del mensual
     assert r9.loc[A, "CEN_MAX_DIAS_ATRASO_1M"] == 30
     assert r["CEN_MAX_DIAS_ATRASO_1M"].isna().all()         # sin mensual para 202603
+
+
+def test_1dsf_solo_en_su_corte(resultado):
+    r9 = resultado[1]
+    assert r9.loc[B, "CEN_CNT_MESES_SIT1_ININT_1M"] == (2026 - 2010) * 12 + 8   # desde 201001, sin tope
+    assert r9.loc[A, "CEN_CNT_MESES_SIT1_ININT_1M"] == 3                         # última situación 2+ en 202606
+
+
+def test_sin_mes_previo_queda_nula(resultado):
+    r0 = resultado[2]                       # 202509: la ventana de 12 meses necesita 202409, que no está
+    assert r0["CEN_CNT_ALTAS_12M"].isna().all() and r0["CEN_RAT_CURA_12M"].isna().all()
+    assert r0["CEN_CNT_ALTAS_3M"].notna().all() and r0["CEN_CNT_ALTAS_6M"].notna().all()
+    assert r0["CEN_MAX_SIT_12M"].notna().all()
