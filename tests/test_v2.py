@@ -152,6 +152,13 @@ def test_1dsf_solo_en_su_corte(resultado):
     assert r9.loc[A, "CEN_CNT_MESES_SIT1_ININT_1M"] == 3                         # última situación 2+ en 202606
 
 
+def test_tipos_estables_entre_fechas(resultado):
+    import pandas.api.types as pt
+    r, r9, r0 = resultado
+    assert pt.is_float_dtype(r0["CEN_RAT_CURA_12M"]) and pt.is_float_dtype(r["CEN_RAT_CURA_12M"])   # nula en 202509, igual DOUBLE
+    assert pt.is_float_dtype(r["CEN_PCT_DEUDA_GTIA_PREF_1M"])                                        # futuro: nula pero DOUBLE
+
+
 def test_sin_mes_previo_queda_nula(resultado):
     r0 = resultado[2]                       # 202509: la ventana de 12 meses necesita 202409, que no está
     assert r0["CEN_CNT_ALTAS_12M"].isna().all() and r0["CEN_RAT_CURA_12M"].isna().all()

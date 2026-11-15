@@ -57,6 +57,7 @@ CREATE OR REPLACE MACRO tipo_persona(c) AS
 """
 
 TIPOS = ["BANCO", "CIA_FIN", "TARJETA_NB", "PNFC", "FIDEICOMISO"]
+TIPO_SQL = {"DECIMAL": "DOUBLE", "INTEGER": "INTEGER", "FLAG": "INTEGER", "CATEGORICA": "VARCHAR"}
 BANCARIOS = "('BANCO', 'CIA_FIN')"
 
 
@@ -307,8 +308,8 @@ def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool, prim
             expr = "NULL"
         if v.get("requiere_mes_previo") and periodo_mas(t, -v["ventana_meses"]) < primero:
             expr = "NULL"
-        if v["tipo_dato"] in ("INTEGER", "FLAG"):
-            expr = f"({expr})::INTEGER"
+        # tipo fijo por variable: una variable anulada conserva su tipo y las partes se pueden leer juntas
+        expr = f"({expr})::{TIPO_SQL[v['tipo_dato']]}"
         (capa2 if v.get("capa") == 2 else capa1).append(f"({expr}) AS {v['nombre']}")
     return ",\n        ".join(capa1), ",\n        ".join(capa2)
 
