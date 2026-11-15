@@ -63,6 +63,10 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--vars-v1", help="Parquet de variables v1 para el valor incremental")
     p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json"); p.add_argument("--obs-v1", type=int, default=202509)
 
+    p = sub.add_parser("pagina-poder", help="v2: arma los CSV de la página del informe de poder")
+    p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--salida", default="reportes/poder_v2/pagina")
+
     p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
     p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
     p.add_argument("--perfil", default="fmargara")
@@ -102,6 +106,10 @@ def main(argv: list[str] | None = None) -> None:
         r = poder.informe(a.dir_variables, a.catalogo, a.salida, fechas_oot=a.oot, pct_muestra=a.pct_muestra,
                           vars_v1=a.vars_v1, modelo_v1=a.modelo_v1 if a.vars_v1 else None, obs_v1=a.obs_v1, memory_limit=a.memoria)
         print(r.head(25).to_string(index=False))
+    elif a.cmd == "pagina-poder":
+        from . import poder
+        for r in poder.archivos_pagina(a.reporte, a.catalogo, a.salida):
+            print(r)
     elif a.cmd == "subir":
         filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
         malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]

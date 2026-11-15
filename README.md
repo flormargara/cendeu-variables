@@ -32,6 +32,8 @@ cendeu variables-v2 data/v2/base data/v2/variables --obs 202509 202510 202511 20
 cendeu subir data/v2/variables variables --simular
 ```
 
+Informe de poder (`cendeu poder`) en [`reportes/poder_v2/`](reportes/poder_v2/), con su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/) (publicada como artifact en claude.ai). Para actualizarla después de recalcular el informe: `cendeu pagina-poder` arma los tres CSV y se reemplazan en el panel de fuentes de la página; el HTML no cambia.
+
 Documentación generada desde el catálogo (`cendeu documentar`): [`docs/variables.md`](docs/variables.md) y [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv).
 
 Referencias públicas (sin datos personales) en [`referencias/`](referencias/): tipo de entidad, fideicomisos de recupero y equivalencias por fusiones.

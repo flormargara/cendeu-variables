@@ -127,3 +127,18 @@ def test_incremental_contra_v1(informe, tmp_path):
     assert abs(inc.loc["(solo score v1)", "gini_test"]) < 0.1        # v1 sobre ruido: sin poder
     assert inc.loc["CEN_VAL_FUERTE_1M", "ganancia_gini"] > 0.4
     assert abs(inc.loc["CEN_VAL_RUIDO_1M", "ganancia_gini"]) < 0.05
+
+
+def test_archivos_pagina(informe, tmp_path):
+    import csv
+
+    _, out = informe
+    rutas = poder.archivos_pagina(out, out.parent / "cat.yaml", tmp_path)
+    assert [p.name for p in rutas] == ["resumen.csv", "por_fecha.csv"]   # sin incremental: no se corrió con v1
+    with open(tmp_path / "resumen.csv", encoding="utf-8") as f:
+        filas = list(csv.reader(f))
+    assert all(len(fila) == len(filas[0]) for fila in filas)          # ninguna coma dentro de un campo
+    cab = filas[0]
+    assert "descripcion" in cab and "representante" in cab
+    fuerte = next(f for f in filas[1:] if f[0] == "CEN_VAL_FUERTE_1M")
+    assert fuerte[cab.index("descripcion")] == "d"

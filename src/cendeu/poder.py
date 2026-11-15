@@ -264,3 +264,33 @@ def informe(dir_vars: str | Path, catalogo: str | Path, dst: str | Path, fechas_
         info["incremental_obs"] = obs_v1
     (dst / "info.json").write_text(json.dumps(info, indent=2, default=str), encoding="utf-8")
     return res
+
+
+# ----------------------------------------------------------------------------- archivos de la página
+def archivos_pagina(dir_reporte: str | Path, catalogo: str | Path, dst: str | Path) -> list[Path]:
+    """Arma los tres CSV que usa la página del informe (``reportes/poder_v2/pagina``).
+
+    Agrega al resumen la descripción de cada variable y la marca de representante de grupo. El lector de
+    CSV de la página separa sólo por comas, así que se reemplazan por ``;`` las comas dentro de los textos.
+    """
+    cat = cat_mod.cargar(catalogo)
+    desc = {v["nombre"]: v["descripcion"] for v in cat.variables}
+    src, dst = Path(dir_reporte), Path(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    r = pd.read_csv(src / "resumen.csv")
+    r.insert(1, "descripcion", r.variable.map(desc))
+    r["representante"] = (r.grupo == r.variable).astype(int)
+    r = r.drop(columns=[c for c in ("tipo_dato", "n_bins", "pct_bin_mayor") if c in r])
+    salidas = {
+        "resumen.csv": (r, "%.4f"),
+        "por_fecha.csv": (pd.read_csv(src / "por_fecha.csv"), "%.5f"),
+    }
+    if (src / "incremental.csv").exists():  # sólo si el informe se corrió con --vars-v1
+        salidas["incremental.csv"] = (pd.read_csv(src / "incremental.csv"), "%.5f")
+    rutas = []
+    for nombre, (df, fmt) in salidas.items():
+        for c in df.select_dtypes(include="object"):
+            df[c] = df[c].astype("string").str.replace(",", ";", regex=False)
+        df.to_csv(dst / nombre, index=False, float_format=fmt)
+        rutas.append(dst / nombre)
+    return rutas
