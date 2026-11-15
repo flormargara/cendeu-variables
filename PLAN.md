@@ -11,7 +11,7 @@ Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA,
 | Target | Situación ≥3 en los **6 meses** siguientes (permite varias fechas de observación, validación *out-of-time* y PSI). Target a 12 meses queda para iteraciones futuras. |
 | IPC | INDEC vía datos.gob.ar, versionado en [`referencias/ipc.csv`](referencias/ipc.csv) y copiado por corte a S3; cada base registra su hash y meses imputados en `_meta.json`. |
 | Almacenamiento | `s3://data-cendeu-raw` (perfil `fmargara`, política [`infra/cendeu-s3-policy.json`](infra/cendeu-s3-policy.json)), una carpeta por período. |
-| v1 | Variables y scores v1 se suben sólo como línea de base; se borran cuando exista v2 (*fresh start*). |
+| v1 | Variables y scores v1 se subieron sólo como línea de base y se borraron de S3 el 2026-11-15, al quedar la v2 completa (*fresh start*, registro en `_control/borrados.csv`). |
 | Repo | Se mantiene el repo actual; el rediseño se hace sobre él. |
 
 ## Layout S3
@@ -19,8 +19,8 @@ Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA,
 ```
 s3://data-cendeu-raw/
   deudores/periodo=AAAAMM/data.parquet        un mes de la central, todas las entidades
-  variables/periodo_obs=AAAAMM/…              variables por CUIT a esa fecha
-  scores/periodo_obs=AAAAMM/…
+  base/{deudores,mensual,persona}/…           base limpia v2 (24DSF + mensual, pesos constantes), particionada por período y bucket
+  variables/periodo_obs=AAAAMM/parte_XX.parquet  variables v2 por CUIT a esa fecha (16 partes)
   deudores_mensual/periodo=AAAAMM/data.parquet  central mensual completa (24 campos)
   entidades/periodo=AAAAMM/maeent.parquet     maestro de entidades
   desde_sit1/periodo=AAAAMM/data.parquet      1DSF: desde cuándo en situación 1
@@ -31,6 +31,8 @@ s3://data-cendeu-raw/
   referencias/ipc|entidades/corte=AAAAMM/      IPC y tablas de entidades usadas en cada corte
   _control/bases.csv                          una fila por base v2 construida (IPC, imputados, hashes)
   _control/fuentes.csv                        registro de las demás fuentes: archivo de origen, filas, bytes, ruta
+  _control/variables.csv                      una fila por parte de variables: fecha de observación, bytes, ruta, estado
+  _control/borrados.csv                       objetos borrados del bucket: fecha, ruta, bytes, motivo
 ```
 
 Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** los 23 solapados (el BCRA rectifica), dejando constancia en `_control/ingestas.csv`.
@@ -39,11 +41,11 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 | # | Fase | Entregable | Estado |
 |---|---|---|---|
-| 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | hecho (tamaños verificados contra local) |
+| 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | hecho (tamaños verificados contra local; la v1 se borró el 2026-11-15) |
 | 1 | Estudio de datos del 24DSF | [`reportes/estudio_24dsf.md`](reportes/estudio_24dsf.md) | hecho |
 | 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (subidas a S3, registro en `_control/fuentes.csv`) |
 | 2 | Catálogo de variables por bloques | [`catalogo/variables.yaml`](catalogo/variables.yaml) (149 variables, validado por `cendeu.catalogo` y test) | hecho (falta corregir signos esperados, ver Fase 6) |
-| 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | [`src/cendeu/v2.py`](src/cendeu/v2.py), [`src/cendeu/s3.py`](src/cendeu/s3.py), [`tests/test_v2.py`](tests/test_v2.py) | hecho: base v2 y variables de las 7 fechas (202509–202603) calculadas en local; **falta subirlas a S3** |
+| 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | [`src/cendeu/v2.py`](src/cendeu/v2.py), [`src/cendeu/s3.py`](src/cendeu/s3.py), [`tests/test_v2.py`](tests/test_v2.py) | hecho: base v2 y variables de las 7 fechas (202509–202603) subidas a S3 (417 archivos de base y 112 partes de variables, tamaños verificados; registro en `_control/`) |
 | 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho |
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | [`docs/variables_mix.md`](docs/variables_mix.md) | hecho (diseño; implementar cuando haya datos propios) |
 | 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | [`reportes/poder_v2/`](reportes/poder_v2/) (`cendeu poder`) y su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/), publicada como artifact en claude.ai | hecho: 99 de 139 variables con IV ≥ 0,1, 60 grupos no redundantes, PSI máximo 0,034 |
@@ -66,11 +68,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 ## Pendientes
 
-- Subir a S3 la base v2 y las variables de las 7 fechas (prefijo a definir para la base, p. ej. `base_v2/`).
 - Modo muestra para desarrollo en `cendeu variables-v2`.
-- Borrar de S3 variables y scores v1 (*fresh start*, con confirmación).
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
-- Limpiar los archivos sueltos sin versionar de la raíz (copias viejas de la v1).
 - Merge de `v2/estudio-datos` en `main`.
 
 ## Bloques de variables (Fase 2)

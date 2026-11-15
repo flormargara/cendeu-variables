@@ -74,6 +74,8 @@ cendeu subir data/v2/base base
 cendeu subir data/v2/variables variables
 ```
 
+Si una subida se corta por la red, `aws s3 sync <carpeta> s3://data-cendeu-raw/<prefijo> --profile fmargara` copia sólo lo que falta; después conviene volver a comparar los tamaños.
+
 Tiempos de referencia (M-series, 10 núcleos, 16 GB, `--memoria 10GB`): base ~6 min; variables ~45 s por parte de ~1,3 M de CUITs (16 partes por fecha, ~12 min por fecha); informe de poder, unos minutos. Con menos de 10 GB fallan pasos que DuckDB no puede volcar a disco. `variables-v2 --retomar` saltea las partes ya escritas si una corrida se corta.
 
 Cada base guarda en `_meta.json` el hash del IPC y de las referencias que usó, y si algún mes del IPC estaba imputado.
