@@ -67,6 +67,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--catalogo", default="catalogo/variables.yaml")
     p.add_argument("--salida", default="reportes/poder_v2/pagina")
 
+    p = sub.add_parser("entrenar-v2", help="v2: scorecards por segmento (situación 1 y 2) con validación fuera de muestra")
+    p.add_argument("dir_variables"); p.add_argument("--salida", default="modelos")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--vars-v1", help="Parquet de variables v1 para comparar en 202509")
+    p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json")
+
     p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
     p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
     p.add_argument("--perfil", default="fmargara")
@@ -110,6 +116,10 @@ def main(argv: list[str] | None = None) -> None:
         from . import poder
         for r in poder.archivos_pagina(a.reporte, a.catalogo, a.salida):
             print(r)
+    elif a.cmd == "entrenar-v2":
+        from . import scorecard_v2
+        scorecard_v2.entrenar_todos(a.dir_variables, a.catalogo, a.salida, vars_v1=a.vars_v1,
+                                    modelo_v1=a.modelo_v1 if a.vars_v1 else None)
     elif a.cmd == "subir":
         filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
         malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]
