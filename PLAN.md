@@ -70,7 +70,6 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 - Modo muestra para desarrollo en `cendeu variables-v2`.
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
-- Merge de `v2/estudio-datos` en `main`.
 
 ## Bloques de variables (Fase 2)
 
