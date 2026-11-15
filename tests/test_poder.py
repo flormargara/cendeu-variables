@@ -23,6 +23,7 @@ variables:
   - {nombre: CEN_VAL_RUIDO_1M, bloque: B01_X, descripcion: d, definicion: d, sql: x, sentido: "+"}
   - {nombre: CEN_VAL_DERIVA_1M, bloque: B01_X, descripcion: d, definicion: d, sql: x, sentido: "-"}
   - {nombre: CEN_CAT_GRUPO_1M, bloque: B01_X, descripcion: d, definicion: d, sql: x, tipo_dato: CATEGORICA}
+  - {nombre: CEN_VAL_PARCIAL_1M, bloque: B01_X, descripcion: d, definicion: d, sql: x, sentido: "+"}
 """
 
 
@@ -44,6 +45,7 @@ def informe(tmp_path_factory):
             "CEN_VAL_RUIDO_1M": rng.normal(size=n),
             "CEN_VAL_DERIVA_1M": rng.normal(loc=3.0 if k == 2 else 0.0, size=n),
             "CEN_CAT_GRUPO_1M": grupo,
+            "CEN_VAL_PARCIAL_1M": np.nan if k == 0 else fuerte,   # no disponible en la primera fecha
         })
         df.loc[df.index[:1000], "CEN_VAL_FUERTE_1M"] = np.nan   # nulos como bin propio
         d = tmp / "vars" / f"periodo_obs={obs}"
@@ -67,6 +69,13 @@ def test_estabilidad(informe):
     r, _ = informe
     assert r.loc["CEN_VAL_DERIVA_1M", "psi_max"] > 1.0
     assert r.loc["CEN_VAL_FUERTE_1M", "psi_max"] < 0.05
+
+
+def test_fecha_no_disponible_no_cuenta(informe):
+    r, _ = informe
+    assert r.loc["CEN_VAL_PARCIAL_1M", "fechas_evaluadas"] == 2
+    assert r.loc["CEN_VAL_PARCIAL_1M", "psi_max"] < 0.05
+    assert r.loc["CEN_VAL_PARCIAL_1M", "iv"] > 0.5
 
 
 def test_sentido_y_grupos(informe):

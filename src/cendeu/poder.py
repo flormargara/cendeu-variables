@@ -62,7 +62,15 @@ def _psi(p_ref: np.ndarray, p: np.ndarray) -> float:
 
 
 def metricas_variable(t: pd.DataFrame, fechas_dev: list[int], fechas_oot: list[int]) -> tuple[dict, pd.DataFrame, pd.DataFrame]:
-    """``t``: columnas obs, bin, orden_valor (posición del bin por valor; NaN para nulos/categorías), n, malos."""
+    """``t``: columnas obs, bin, orden_valor (posición del bin por valor; NaN para nulos/categorías), n, malos.
+
+    Las fechas en que la variable es 100% nula (no disponible, p. ej. por falta de historia) se excluyen.
+    """
+    por_obs = t.groupby("obs").apply(lambda g: (g.bin != "NULO").any(), include_groups=False)
+    disponibles = set(por_obs[por_obs].index)
+    t = t[t.obs.isin(disponibles)]
+    fechas_dev = [f for f in fechas_dev if f in disponibles]
+    fechas_oot = [f for f in fechas_oot if f in disponibles]
     dev = t[t.obs.isin(fechas_dev)].groupby("bin", as_index=False).agg(n=("n", "sum"), malos=("malos", "sum"),
                                                                         orden_valor=("orden_valor", "first"))
     n, m = dev.n.to_numpy(float), dev.malos.to_numpy(float)
@@ -101,6 +109,7 @@ def metricas_variable(t: pd.DataFrame, fechas_dev: list[int], fechas_oot: list[i
         "psi_max": float(pf.loc[pf.obs.isin(fechas_oot + fechas_dev), "psi"].max()),
         "pct_nulos_dev": float(dev.loc[dev.bin == "NULO", "n"].sum() / n.sum()),
         "pct_bin_mayor": float(n.max() / n.sum()), "n_bins": int(len(dev)), "sentido_observado": sentido,
+        "fechas_evaluadas": len(disponibles),
     }
     bins = dev.assign(woe=woe, tasa=tasa)
     return res, pf, bins
@@ -241,7 +250,7 @@ def informe(dir_vars: str | Path, catalogo: str | Path, dst: str | Path, fechas_
     res = res.merge(grupos.rename(columns={"representante": "grupo"})[["variable", "grupo"]], on="variable", how="left")
     res = res.sort_values("iv", ascending=False)
     cols = ["variable", "bloque", "uso", "tipo_dato", "iv", "gini_dev", "ks_dev", "gini_oot", "psi_max", "pct_nulos_dev",
-            "pct_bin_mayor", "n_bins", "sentido_esperado", "sentido_observado", "sentido_ok", "grupo"]
+            "pct_bin_mayor", "n_bins", "fechas_evaluadas", "sentido_esperado", "sentido_observado", "sentido_ok", "grupo"]
     res[cols].to_csv(dst / "resumen.csv", index=False, float_format="%.6f")
     pf[["variable", "obs", "n", "tasa_target", "gini", "psi", "pct_nulos"]].to_csv(dst / "por_fecha.csv", index=False, float_format="%.6f")
     bins[["variable", "bin", "n", "malos", "tasa", "woe"]].to_csv(dst / "bins.csv", index=False, float_format="%.6f")
