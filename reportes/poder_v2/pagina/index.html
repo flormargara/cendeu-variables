@@ -1,0 +1,397 @@
+<meta name="dash-one-writer">
+<style>
+  .pv { display: flex; flex-direction: column; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+  .pv-head { display: flex; flex-direction: column; gap: var(--cds-gap-sm); max-width: 72ch; }
+  .pv-title { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+  .pv-lead { font-size: var(--cds-font-size-heading); line-height: 1.45; margin: 0; }
+  .pv-lead b, .pv-num { font-variant-numeric: tabular-nums; font-weight: var(--cds-font-weight-medium); }
+  .pv-context { color: var(--color-fg-muted); margin: 0; line-height: 1.5; }
+  .pv-sec { display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+  .pv-sec h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; text-wrap: balance; }
+  .pv-note { color: var(--color-fg-muted); margin: 0; max-width: 72ch; line-height: 1.5; }
+  .pv-chart { position: relative; width: 100%; min-height: 220px; }
+  .pv-chart svg { display: block; width: 100%; overflow: visible; }
+  .pv-chart text { font-family: var(--font-anthropic-sans); }
+  .pv-chart .tick text, .pv-axis-label { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); }
+  .pv-chart .tick line, .pv-chart .domain { stroke: var(--cds-chart-axis); }
+  .pv-grid line { stroke: var(--cds-chart-grid); }
+  .pv-ref { stroke: var(--cds-chart-reference); stroke-dasharray: 3 3; }
+  .pv-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: var(--cds-pad-sm) var(--cds-pad-md); font-size: var(--cds-font-size-caption); max-width: 280px; line-height: 1.4; z-index: 2; }
+  .pv-tip b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; word-break: break-all; }
+  .pv-tip span { color: var(--cds-text-secondary); display: block; }
+  .pv-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .pv-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .pv-controls { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); align-items: center; }
+  .pv-controls label { display: inline-flex; gap: 6px; align-items: center; font-size: var(--cds-font-size-body); }
+  .pv-tablewrap { overflow-x: auto; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); }
+  .pv-table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .pv-table th, .pv-table td { padding: 8px 10px; border-bottom: 1px solid var(--color-border-line); text-align: right; vertical-align: top; white-space: nowrap; }
+  .pv-table th { color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); background: var(--color-panel); position: sticky; top: 0; }
+  .pv-table th:first-child, .pv-table td:first-child, .pv-table .pv-left { text-align: left; }
+  .pv-table td:first-child { white-space: normal; min-width: 240px; }
+  .pv-table code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95em; }
+  .pv-desc { display: block; color: var(--color-fg-muted); margin-top: 2px; }
+  .pv-pill { display: inline-block; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--color-border-line); }
+  .pv-pill.pv-warn { border-color: var(--color-warn); color: var(--color-warn); }
+  .pv-small { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .pv-notes { border-top: 1px solid var(--color-border-line); padding-top: var(--cds-pad-md); max-width: 80ch; }
+  .pv-notes summary { cursor: pointer; font-weight: var(--cds-font-weight-medium); }
+  .pv-notes dl { display: grid; grid-template-columns: minmax(80px, max-content) 1fr; gap: 8px 16px; margin: var(--cds-gap-md) 0; }
+  .pv-notes dt { font-weight: var(--cds-font-weight-medium); }
+  .pv-notes dd { margin: 0; color: var(--color-fg-muted); line-height: 1.5; }
+  .pv-notes ul { color: var(--color-fg-muted); line-height: 1.5; padding-left: 1.2em; }
+  [data-dash-source-state=refreshing] { opacity: .5; }
+</style>
+
+<div class="pv">
+  <header class="pv-head" id="resumen-head">
+    <h1 class="pv-title" id="titulo">Poder de las variables CENDEU v2</h1>
+    <p class="pv-lead" id="lectura">De <b data-draw="kpi" data-source="kpis" data-field="evaluadas" data-row="0">—</b> variables candidatas, <b data-draw="kpi" data-source="kpis" data-field="iv01" data-row="0">—</b> tienen IV de 0,1 o más, <b data-draw="kpi" data-source="kpis" data-field="iv03" data-row="0">—</b> de 0,3 o más, y se agrupan en <b data-draw="kpi" data-source="kpis" data-field="grupos" data-row="0">—</b> grupos no redundantes. El PSI más alto entre fechas es <b data-draw="kpi" data-source="kpis" data-field="psi_max" data-row="0">—</b>; por debajo de 0,1 la distribución se considera estable.</p>
+    <p class="pv-context">Población: CUITs presentes en la central en situación 1 o 2, no fallecidos. Target: llegar a situación 3 o peor en alguna entidad en los 6 meses siguientes. Muestra fija del 10% de los CUITs. Desarrollo: 202509 a 202601; fuera de muestra: 202602 y 202603.</p>
+  </header>
+
+  <section class="pv-sec" id="poblacion">
+    <h2>La tasa de target baja de una fecha a la siguiente</h2>
+    <p class="pv-note">Proporción de la población que llega a situación 3 o peor en los 6 meses siguientes, por fecha de observación. Las dos últimas fechas son fuera de muestra.</p>
+    <div class="pv-chart" data-draw="chart-tasa" data-source="poblacion" style="min-height: 240px"></div>
+  </section>
+
+  <section class="pv-sec" id="bloques">
+    <h2>Calidad, momentum y transiciones concentran el poder</h2>
+    <p class="pv-note">Cada punto es una variable, ubicada según su IV en desarrollo (escala de raíz cuadrada). Las líneas punteadas marcan los umbrales habituales: 0,02 débil, 0,1 medio, 0,3 fuerte. Las variables muy correlacionadas (Spearman ≥ 0,8) forman un grupo; el representante es la de mayor IV.</p>
+    <div class="pv-legend" id="leyenda-bloques"><span><i style="background: var(--cds-chart-1, currentColor)" data-draw="swatch-rep"></i>Representante de su grupo</span><span><i style="border: 1.5px solid var(--cds-chart-muted)"></i>Redundante con otra variable</span></div>
+    <div class="pv-chart" data-draw="chart-bloques" data-source="resumen" style="min-height: 340px"></div>
+    <div class="pv-tablewrap">
+      <table class="pv-table" id="tabla-bloques" data-source="bloques" data-row-key="bloque">
+        <thead><tr><th>Bloque</th><th data-field="variables">Variables</th><th data-field="iv_max">IV máximo</th><th data-field="iv_mediana">IV mediano</th><th data-field="representantes">Representantes</th></tr></thead>
+        <tbody data-draw="tabla-bloques"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="pv-sec" id="estabilidad">
+    <h2>El poder se sostiene fuera de muestra</h2>
+    <p class="pv-note">Gini en desarrollo contra Gini en las fechas fuera de muestra, con los bins fijados en desarrollo. Sobre la diagonal, la variable discrimina igual o mejor en fechas que no vio.</p>
+    <div class="pv-chart" data-draw="chart-estabilidad" data-source="resumen" style="min-height: 320px"></div>
+  </section>
+
+  <section class="pv-sec" id="variables">
+    <h2>Todas las variables</h2>
+    <div class="pv-controls">
+      <select class="dash-select" id="f-bloque" aria-label="Bloque">
+        <option value="">Todos los bloques</option>
+        <option value="B01_MAGNITUD">Magnitud</option>
+        <option value="B02_CALIDAD">Calidad</option>
+        <option value="B03_TRANSICIONES">Transiciones</option>
+        <option value="B04_VELOCIDAD">Velocidad</option>
+        <option value="B05_MOMENTUM">Momentum (RSI)</option>
+        <option value="B06_RELACION_SISTEMA">Relación con el sistema</option>
+        <option value="B07_MIX_ENTIDADES">Mix por tipo de entidad</option>
+        <option value="B09_PERSONA">Persona</option>
+        <option value="B10_ALERTAS">Alertas</option>
+      </select>
+      <label for="f-rep"><input type="checkbox" id="f-rep" checked>Sólo representantes de grupo</label>
+      <span class="pv-small" data-draw="tabla-cuenta">—</span>
+    </div>
+    <div class="pv-tablewrap">
+      <table class="pv-table" id="tabla-variables" data-source="resumen" data-row-key="variable">
+        <thead><tr>
+          <th>Variable</th><th class="pv-left">Bloque</th><th data-field="iv">IV</th><th data-field="gini_dev">Gini desarrollo</th><th data-field="gini_oot">Gini fuera de muestra</th><th data-field="ks_dev">KS</th><th data-field="psi_max">PSI máx.</th><th data-field="pct_nulos_dev">Nulos</th><th>Sentido esperado / observado</th><th data-field="fechas_evaluadas">Fechas</th>
+        </tr></thead>
+        <tbody data-draw="tabla-variables"></tbody>
+      </table>
+    </div>
+    <p class="pv-small">Sentido: <code>+</code> = a más valor, más riesgo. En naranja, las variables cuyo signo observado no coincide con el esperado en el catálogo.</p>
+  </section>
+
+  <section class="pv-sec" id="incremental">
+    <h2>Ganancia sobre el scorecard v1</h2>
+    <p class="pv-note">En 202509, sobre personas humanas en situación 1 (la población de la v1), el score v1 solo tiene un Gini de <b class="pv-num" data-draw="gini-v1" data-source="incremental" data-field="gini_test" data-where="variable=(solo score v1)">—</b> en el 30% de test. Cada barra es la ganancia de Gini al sumar una variable v2 al score v1 en una regresión de dos variables, para las mejores representantes de grupo.</p>
+    <div class="pv-chart" data-draw="chart-incremental" data-source="incremental" style="min-height: 300px"></div>
+    <p class="pv-note">La v1 se entrenó con esta misma fecha, así que la comparación la favorece y la ganancia de cada variable está subestimada. El aporte conjunto de la v2 se mide en el modelo multivariado.</p>
+  </section>
+
+  <details class="pv-notes" id="notas">
+    <summary>Definiciones y advertencias</summary>
+    <dl>
+      <dt>IV</dt><dd>Information Value: separación entre buenos y malos a lo largo de los bins de la variable. 0,02–0,1 débil, 0,1–0,3 medio, más de 0,3 fuerte. Valores muy altos suelen indicar que la variable ya contiene el estado actual del deudor.</dd>
+      <dt>Gini</dt><dd>2 × AUC − 1, ordenando los bins por la tasa de malos observada en desarrollo. En fuera de muestra se usa ese mismo orden.</dd>
+      <dt>KS</dt><dd>Máxima distancia entre las distribuciones acumuladas de buenos y malos.</dd>
+      <dt>PSI</dt><dd>Population Stability Index de cada fecha contra la distribución de desarrollo. Menos de 0,1 estable, 0,1–0,25 vigilar, más de 0,25 cambio fuerte.</dd>
+      <dt>Bins</dt><dd>Deciles de desarrollo para las numéricas, categorías con al menos 1% para las categóricas, y un bin propio para los nulos.</dd>
+    </dl>
+    <ul>
+      <li>No se evalúan las variables marcadas como <i>futuro</i>: la foto del mensual (sólo existe desde 202609) y los meses en situación 1 según el 1DSF, que en fechas anteriores a su corte filtraba el desempeño.</li>
+      <li>Las variables que necesitan el mes previo a una ventana de 12 meses (altas, bajas, curas, rolls) no existen en 202509 y se evaluaron en las 6 fechas restantes.</li>
+      <li>El sexo se informa sólo para monitorear sesgos; no es candidata al score.</li>
+      <li>La población incluye a quienes hoy están en situación 2. Por eso muchas variables de magnitud y calidad son, en la práctica, la misma señal ("está en situación 2 ahora") y quedan agrupadas. Se recomienda modelar por separado situación 1 y situación 2.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+  // Formatos en castellano (coma decimal) y nombres de bloque compartidos por las otras scripts.
+  const L = d3.formatLocale({decimal: ',', thousands: '.', grouping: [3], currency: ['$', '']});
+  window.pv = {
+    f2: L.format('.2f'), f3: L.format('.3f'), f4: L.format('.4f'), fpct: L.format('.1%'), fint: L.format(',d'),
+    fsigned: L.format('+.4f'),
+    bloque: {B01_MAGNITUD: 'Magnitud', B02_CALIDAD: 'Calidad', B03_TRANSICIONES: 'Transiciones', B04_VELOCIDAD: 'Velocidad',
+             B05_MOMENTUM: 'Momentum (RSI)', B06_RELACION_SISTEMA: 'Relación con el sistema', B07_MIX_ENTIDADES: 'Mix por tipo de entidad',
+             B08_FOTO_MENSUAL: 'Foto del mensual', B09_PERSONA: 'Persona', B10_ALERTAS: 'Alertas'},
+    periodo: (p) => { const s = String(p); const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+s.slice(4, 6) - 1]; return `${m}-${s.slice(2, 4)}`; },
+    tip: (box) => {
+      let t = box.querySelector('.pv-tip');
+      if (!t) { t = document.createElement('div'); t.className = 'pv-tip'; t.hidden = true; box.appendChild(t); }
+      return {
+        show(ev, lines) {
+          t.replaceChildren(...lines.map((l, i) => { const e = document.createElement(i === 0 ? 'b' : 'span'); e.textContent = l; return e; }));
+          t.hidden = false;
+          const r = box.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+          const w = t.offsetWidth, h = t.offsetHeight;
+          t.style.left = Math.max(0, Math.min(x + 12, r.width - w)) + 'px';
+          t.style.top = Math.max(0, y - h - 10) + 'px';
+        },
+        hide() { t.hidden = true; },
+      };
+    },
+    status: (el, ...ids) => {
+      const st = ids.map((id) => dash.data(id).status);
+      if (st.every((s) => s === 'ok')) return true;
+      el.replaceChildren();
+      const p = document.createElement('p'); p.className = 'pv-small';
+      p.textContent = st.includes('error') || st.includes('missing') ? 'No se pudieron cargar los datos.' : '—';
+      el.appendChild(p);
+      return false;
+    },
+  };
+
+  dash.calc('kpis', {
+    inputs: ['resumen'],
+    title: 'Resumen de variables evaluadas',
+    description: 'Cuenta las variables candidatas al modelo, cuántas superan IV 0,1 y 0,3, los grupos no redundantes y el PSI máximo.',
+    fn: (resumen) => {
+      const m = resumen.filter((r) => r.uso === 'modelo');
+      return [{
+        evaluadas: m.length,
+        iv01: m.filter((r) => +r.iv >= 0.1).length,
+        iv03: m.filter((r) => +r.iv >= 0.3).length,
+        grupos: new Set(m.map((r) => r.grupo).filter((g) => g)).size,
+        psi_max: Math.max(...m.map((r) => +r.psi_max)),
+      }];
+    },
+  });
+
+  dash.calc('poblacion', {
+    inputs: ['por_fecha'],
+    title: 'Población y tasa de target por fecha',
+    description: 'Tamaño de la muestra y tasa de target de cada fecha de observación (iguales para todas las variables).',
+    fn: (porFecha) => {
+      const porObs = new Map();
+      for (const r of porFecha) if (!porObs.has(r.obs)) porObs.set(r.obs, {obs: r.obs, n: +r.n, tasa_target: +r.tasa_target, oot: +r.obs >= 202602 ? 1 : 0});
+      return [...porObs.values()].sort((a, b) => +a.obs - +b.obs);
+    },
+  });
+
+  dash.calc('bloques', {
+    inputs: ['resumen'],
+    title: 'Poder por bloque',
+    description: 'Por bloque: variables candidatas, IV máximo y mediano, y cuántas son representantes de su grupo.',
+    fn: (resumen) => {
+      const m = resumen.filter((r) => r.uso === 'modelo');
+      const g = d3.group(m, (r) => r.bloque);
+      return [...g].map(([bloque, rs]) => ({
+        bloque,
+        variables: rs.length,
+        iv_max: d3.max(rs, (r) => +r.iv),
+        iv_mediana: d3.median(rs, (r) => +r.iv),
+        representantes: rs.filter((r) => r.representante === '1').length,
+      })).sort((a, b) => a.bloque.localeCompare(b.bloque));
+    },
+  });
+</script>
+
+<script>
+  dash.draw('kpi', (el) => {
+    const k = dash.data('kpis');
+    if (k.status !== 'ok' || !k.data || !k.data.length) { el.textContent = '—'; return; }
+    const v = k.data[0][el.dataset.field];
+    el.textContent = el.dataset.field === 'psi_max' ? pv.f3(v) : pv.fint(v);
+  });
+
+  dash.draw('swatch-rep', (el) => { el.style.background = dash.colors[0]; });
+
+  dash.draw('gini-v1', (el) => {
+    const d = dash.data('incremental');
+    const r = d.status === 'ok' ? d.data.find((x) => x.variable === '(solo score v1)') : null;
+    el.textContent = r ? pv.f3(+r.gini_test) : '—';
+  });
+
+  dash.draw('chart-tasa', (el) => {
+    if (!pv.status(el, 'poblacion')) return;
+    const rows = dash.data('poblacion').data;
+    el.replaceChildren();
+    const W = el.clientWidth || 600, H = 240, m = {t: 24, r: 16, b: 32, l: 44};
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'Tasa de target por fecha de observación');
+    const x = d3.scalePoint().domain(rows.map((r) => r.obs)).range([m.l, W - m.r]).padding(0.4);
+    const y = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.tasa_target) * 1.2]).nice().range([H - m.b, m.t]);
+    const oot = rows.filter((r) => r.oot);
+    if (oot.length) {
+      const x0 = x(oot[0].obs) - x.step() / 2;
+      svg.append('rect').attr('x', x0).attr('y', m.t).attr('width', W - m.r - x0).attr('height', H - m.b - m.t)
+        .style('fill', 'var(--cds-chart-muted)').style('opacity', 0.15);
+      svg.append('text').attr('class', 'pv-axis-label').attr('x', x0 + 6).attr('y', m.t + 12).text('fuera de muestra');
+    }
+    svg.append('g').attr('class', 'pv-grid').attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat('')).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(pv.fpct)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickFormat(pv.periodo));
+    svg.append('path').datum(rows).attr('d', d3.line().x((r) => x(r.obs)).y((r) => y(r.tasa_target)))
+      .style('fill', 'none').style('stroke', dash.colors[0]).style('stroke-width', 2);
+    const tip = pv.tip(el);
+    svg.selectAll('circle').data(rows).join('circle').attr('cx', (r) => x(r.obs)).attr('cy', (r) => y(r.tasa_target)).attr('r', 4)
+      .style('fill', dash.colors[0])
+      .on('pointermove', (ev, r) => tip.show(ev, [pv.periodo(r.obs), `Tasa de target: ${pv.fpct(r.tasa_target)}`, `CUITs en la muestra: ${pv.fint(r.n)}`]))
+      .on('pointerleave', () => tip.hide());
+    svg.selectAll('.pv-val').data(rows).join('text').attr('class', 'pv-axis-label pv-val').attr('text-anchor', 'middle')
+      .attr('x', (r) => x(r.obs)).attr('y', (r) => y(r.tasa_target) - 10).text((r) => pv.fpct(r.tasa_target));
+  });
+</script>
+
+<script>
+  dash.draw('chart-bloques', (el) => {
+    if (!pv.status(el, 'resumen')) return;
+    const rows = dash.data('resumen').data.filter((r) => r.uso === 'modelo').map((r) => ({...r, iv: +r.iv, gini_oot: +r.gini_oot}));
+    el.replaceChildren();
+    const bloques = [...new Set(rows.map((r) => r.bloque))].sort();
+    const W = el.clientWidth || 600, fila = 34, m = {t: 26, r: 16, b: 30, l: 0};
+    const H = m.t + bloques.length * fila + m.b;
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'IV de cada variable agrupada por bloque');
+    const labels = svg.append('g');
+    labels.selectAll('text').data(bloques).join('text').attr('class', 'pv-axis-label').text((b) => pv.bloque[b] || b);
+    const anchoLabel = d3.max(labels.selectAll('text').nodes(), (n) => n.getComputedTextLength()) || 120;
+    m.l = Math.min(anchoLabel + 12, W * 0.4);
+    const y = d3.scaleBand().domain(bloques).range([m.t, H - m.b]).padding(0.2);
+    labels.selectAll('text').attr('x', 0).attr('y', (b) => y(b) + y.bandwidth() / 2).attr('dy', '0.35em');
+    const x = d3.scaleSqrt().domain([0, d3.max(rows, (r) => r.iv) * 1.05]).range([m.l, W - m.r]);
+    const ticks = [0, 0.02, 0.1, 0.3, 0.5, 1, 1.5, 2].filter((t) => t <= x.domain()[1]);
+    svg.append('g').attr('class', 'pv-grid').attr('transform', `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).tickValues(ticks).tickSize(-(H - m.t - m.b)).tickFormat('')).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickValues(ticks).tickFormat((t) => pv.f2(t).replace(/,00$/, '')));
+    for (const [v, nombre] of [[0.02, 'débil'], [0.1, 'medio'], [0.3, 'fuerte']]) {
+      svg.append('line').attr('class', 'pv-ref').attr('x1', x(v)).attr('x2', x(v)).attr('y1', m.t - 4).attr('y2', H - m.b);
+      svg.append('text').attr('class', 'pv-axis-label').attr('x', x(v) + 3).attr('y', m.t - 8).text(nombre);
+    }
+    const jit = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 997; return (h / 997 - 0.5) * 0.7; };
+    const tip = pv.tip(el);
+    svg.append('g').selectAll('circle').data(rows).join('circle')
+      .attr('cx', (r) => x(Math.max(r.iv, 0))).attr('cy', (r) => y(r.bloque) + y.bandwidth() / 2 + jit(r.variable) * y.bandwidth())
+      .attr('r', 4.5)
+      .style('fill', (r) => r.representante === '1' ? dash.colors[0] : 'var(--color-bg)')
+      .style('stroke', (r) => r.representante === '1' ? dash.colors[0] : 'var(--cds-chart-muted)').style('stroke-width', 1.5)
+      .on('pointermove', (ev, r) => tip.show(ev, [r.variable, r.descripcion, `IV ${pv.f3(r.iv)} · Gini fuera de muestra ${pv.f3(r.gini_oot)}`,
+        r.representante === '1' ? 'Representante de su grupo' : `Redundante con ${r.grupo}`]))
+      .on('pointerleave', () => tip.hide());
+  });
+
+  dash.draw('tabla-bloques', (tb) => {
+    const d = dash.data('bloques');
+    if (d.status !== 'ok' || !d.data) { tb.replaceChildren(); return; }
+    d3.select(tb).selectAll('tr').data(d.data, (r) => r.bloque).join('tr').attr('data-key', (r) => r.bloque)
+      .selectAll('td').data((r) => [pv.bloque[r.bloque] || r.bloque, pv.fint(r.variables), pv.f3(r.iv_max), pv.f3(r.iv_mediana), pv.fint(r.representantes)])
+      .join('td').text((v) => v);
+  });
+</script>
+
+<script>
+  dash.draw('chart-estabilidad', (el) => {
+    if (!pv.status(el, 'resumen')) return;
+    const rows = dash.data('resumen').data.filter((r) => r.uso === 'modelo' && r.gini_oot !== null && r.gini_oot !== '')
+      .map((r) => ({...r, gd: +r.gini_dev, go: +r.gini_oot}));
+    el.replaceChildren();
+    const W = el.clientWidth || 600, H = Math.min(360, Math.max(260, W * 0.6)), m = {t: 12, r: 16, b: 40, l: 48};
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'Gini en desarrollo contra Gini fuera de muestra para cada variable');
+    const lo = Math.min(0, d3.min(rows, (r) => Math.min(r.gd, r.go))), hi = d3.max(rows, (r) => Math.max(r.gd, r.go)) * 1.05;
+    const x = d3.scaleLinear().domain([lo, hi]).range([m.l, W - m.r]);
+    const y = d3.scaleLinear().domain([lo, hi]).range([H - m.b, m.t]);
+    svg.append('g').attr('class', 'pv-grid').attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(5).tickSize(-(W - m.l - m.r)).tickFormat('')).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(pv.f2));
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(5).tickFormat(pv.f2));
+    svg.append('line').attr('class', 'pv-ref').attr('x1', x(lo)).attr('y1', y(lo)).attr('x2', x(hi)).attr('y2', y(hi));
+    svg.append('text').attr('class', 'pv-axis-label').attr('x', (m.l + W - m.r) / 2).attr('y', H - 6).attr('text-anchor', 'middle').text('Gini en desarrollo');
+    svg.append('text').attr('class', 'pv-axis-label').attr('transform', `translate(12,${(m.t + H - m.b) / 2}) rotate(-90)`).attr('text-anchor', 'middle').text('Gini fuera de muestra');
+    const tip = pv.tip(el);
+    svg.append('g').selectAll('circle').data(rows).join('circle').attr('cx', (r) => x(r.gd)).attr('cy', (r) => y(r.go)).attr('r', 4)
+      .style('fill', (r) => r.representante === '1' ? dash.colors[0] : 'var(--color-bg)')
+      .style('stroke', (r) => r.representante === '1' ? dash.colors[0] : 'var(--cds-chart-muted)').style('stroke-width', 1.5)
+      .on('pointermove', (ev, r) => tip.show(ev, [r.variable, r.descripcion, `Gini desarrollo ${pv.f3(r.gd)} · fuera de muestra ${pv.f3(r.go)}`]))
+      .on('pointerleave', () => tip.hide());
+  });
+
+  dash.draw('chart-incremental', (el) => {
+    if (!pv.status(el, 'incremental')) return;
+    const rows = dash.data('incremental').data.filter((r) => r.variable !== '(solo score v1)')
+      .map((r) => ({...r, g: +r.ganancia_gini})).sort((a, b) => b.g - a.g).slice(0, 15);
+    el.replaceChildren();
+    const W = el.clientWidth || 600, fila = 38, m = {t: 8, r: 64, b: 24, l: 0};
+    const H = m.t + rows.length * fila + m.b;
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+      .attr('aria-label', 'Ganancia de Gini sobre el score v1 por variable');
+    const x = d3.scaleLinear().domain([Math.min(0, d3.min(rows, (r) => r.g)), d3.max(rows, (r) => r.g) * 1.1]).range([m.l, W - m.r]);
+    const y = d3.scaleBand().domain(rows.map((r) => r.variable)).range([m.t, H - m.b]).padding(0.15);
+    const tip = pv.tip(el);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r) => `translate(0,${y(r.variable)})`);
+    g.append('text').attr('class', 'pv-axis-label').attr('x', 0).attr('y', 11).style('fill', 'var(--color-fg)').text((r) => r.variable);
+    g.append('rect').attr('x', (r) => x(Math.min(0, r.g))).attr('y', 16).attr('height', y.bandwidth() - 16)
+      .attr('width', (r) => Math.abs(x(r.g) - x(0))).style('fill', dash.colors[0])
+      .on('pointermove', (ev, r) => tip.show(ev, [r.variable, `Gini con el score v1: ${pv.f3(+r.gini_test)}`, `Ganancia: ${pv.fsigned(r.g)}`]))
+      .on('pointerleave', () => tip.hide());
+    g.append('text').attr('class', 'pv-axis-label').attr('x', (r) => x(Math.max(0, r.g)) + 6).attr('y', 16 + (y.bandwidth() - 16) / 2).attr('dy', '0.35em')
+      .text((r) => pv.fsigned(r.g));
+  });
+</script>
+
+<script>
+  document.querySelectorAll('#f-bloque, #f-rep').forEach((c) => c.addEventListener('change', () => { dash.draw('tabla-variables'); dash.draw('tabla-cuenta'); }));
+
+  window.pvFiltrar = () => {
+    const d = dash.data('resumen');
+    if (d.status !== 'ok') return null;
+    const sel = document.getElementById('f-bloque'), rep = document.getElementById('f-rep');
+    return d.data.filter((r) => (!sel || !sel.value || r.bloque === sel.value) && (!rep || !rep.checked || r.representante === '1' || r.uso !== 'modelo'))
+      .sort((a, b) => +b.iv - +a.iv);
+  };
+
+  dash.draw('tabla-cuenta', (el) => {
+    const rows = pvFiltrar();
+    el.textContent = rows ? `${pv.fint(rows.length)} variables, ordenadas por IV` : '—';
+  });
+
+  dash.draw('tabla-variables', (tb) => {
+    const rows = pvFiltrar();
+    if (!rows) { tb.replaceChildren(); return; }
+    const num = (v, f) => (v === null || v === '' || Number.isNaN(+v)) ? '—' : f(+v);
+    const tr = d3.select(tb).selectAll('tr').data(rows, (r) => r.variable).join('tr').attr('data-key', (r) => r.variable);
+    tr.each(function (r) {
+      const celdas = [];
+      const c0 = document.createElement('td');
+      const code = document.createElement('code'); code.textContent = r.variable;
+      const desc = document.createElement('span'); desc.className = 'pv-desc'; desc.textContent = r.descripcion || '';
+      c0.append(code, desc); celdas.push(c0);
+      const td = (txt, cls) => { const e = document.createElement('td'); e.textContent = txt; if (cls) e.className = cls; return e; };
+      celdas.push(td(pv.bloque[r.bloque] || r.bloque, 'pv-left'));
+      celdas.push(td(num(r.iv, pv.f3)), td(num(r.gini_dev, pv.f3)), td(num(r.gini_oot, pv.f3)), td(num(r.ks_dev, pv.f3)),
+                  td(num(r.psi_max, pv.f3)), td(num(r.pct_nulos_dev, pv.fpct)));
+      const cs = document.createElement('td');
+      const pill = document.createElement('span');
+      pill.className = 'pv-pill' + (r.sentido_ok === 'False' ? ' pv-warn' : '');
+      pill.textContent = `${r.sentido_esperado || '?'} / ${r.sentido_observado || '·'}`;
+      cs.appendChild(pill); celdas.push(cs);
+      celdas.push(td(num(r.fechas_evaluadas, pv.fint)));
+      this.replaceChildren(...celdas);
+    });
+  });
+</script>

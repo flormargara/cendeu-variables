@@ -1,0 +1,1651 @@
+{
+  "version": "validacion-v2",
+  "uso": "validación de variables; no es un modelo para producción",
+  "creado": "2026-11-15T00:30:41",
+  "segmento": "sit2",
+  "fuente": {
+    "variables": "variables v2 (catalogo/variables.yaml)",
+    "fechas_desarrollo": [
+      202510,
+      202511,
+      202512,
+      202601
+    ],
+    "fechas_oot": [
+      202602,
+      202603
+    ],
+    "pct_muestra": 30
+  },
+  "poblacion": "EN_POBLACION = 1 AND CEN_MAX_SIT_1M = 2",
+  "target": "CEN_TGT_SIT3P_6M: situación >= 3 en alguna entidad en los 6 meses siguientes",
+  "convencion_woe": "ln(%buenos/%malos); bin = desde < x <= hasta (None = infinito)",
+  "escala": {
+    "base": 600,
+    "odds_buenos_malos": 50,
+    "pdo": 20,
+    "factor": 28.853901,
+    "offset": 487.122876
+  },
+  "intercepto": 1.239408,
+  "variables": [
+    {
+      "nombre": "CEN_RSI_DEUDA_12M",
+      "coef": -0.544459,
+      "iv": 0.3903,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 20.228099822998047,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.59334,
+          "woe": 0.847136,
+          "puntos": 51
+        },
+        {
+          "desde": 20.228099822998047,
+          "hasta": 33.400808334350586,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.62493,
+          "woe": 0.714395,
+          "puntos": 49
+        },
+        {
+          "desde": 33.400808334350586,
+          "hasta": 41.752509117126465,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.63958,
+          "woe": 0.651384,
+          "puntos": 48
+        },
+        {
+          "desde": 41.752509117126465,
+          "hasta": 52.4269905090332,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.65712,
+          "woe": 0.574417,
+          "puntos": 47
+        },
+        {
+          "desde": 52.4269905090332,
+          "hasta": 56.45041084289551,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.68635,
+          "woe": 0.44183,
+          "puntos": 45
+        },
+        {
+          "desde": 56.45041084289551,
+          "hasta": 60.12396812438965,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.70888,
+          "woe": 0.335004,
+          "puntos": 43
+        },
+        {
+          "desde": 60.12396812438965,
+          "hasta": 63.46986389160156,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.73291,
+          "woe": 0.215524,
+          "puntos": 41
+        },
+        {
+          "desde": 63.46986389160156,
+          "hasta": 69.77673721313477,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.76297,
+          "woe": 0.055916,
+          "puntos": 38
+        },
+        {
+          "desde": 69.77673721313477,
+          "hasta": 72.8591136932373,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.78895,
+          "woe": -0.093647,
+          "puntos": 36
+        },
+        {
+          "desde": 72.8591136932373,
+          "hasta": 79.13331985473633,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.81042,
+          "woe": -0.227809,
+          "puntos": 34
+        },
+        {
+          "desde": 79.13331985473633,
+          "hasta": 82.34336853027344,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.83211,
+          "woe": -0.375668,
+          "puntos": 32
+        },
+        {
+          "desde": 82.34336853027344,
+          "hasta": 85.65728378295898,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.85408,
+          "woe": -0.542001,
+          "puntos": 29
+        },
+        {
+          "desde": 85.65728378295898,
+          "hasta": 92.91622543334961,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.88633,
+          "woe": -0.828843,
+          "puntos": 25
+        },
+        {
+          "desde": 92.91622543334961,
+          "hasta": 96.92106628417969,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.91687,
+          "woe": -1.175515,
+          "puntos": 19
+        },
+        {
+          "desde": 96.92106628417969,
+          "hasta": null,
+          "nulo": false,
+          "n": 75906,
+          "tasa_malos": 0.92343,
+          "woe": -1.264922,
+          "puntos": 18
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_CNT_ENT_EMPEORA_3M",
+      "coef": -0.879689,
+      "iv": 0.2749,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.0,
+          "nulo": false,
+          "n": 131971,
+          "tasa_malos": 0.64011,
+          "woe": 0.649074,
+          "puntos": 54
+        },
+        {
+          "desde": 0.0,
+          "hasta": 1.0,
+          "nulo": false,
+          "n": 545594,
+          "tasa_malos": 0.77849,
+          "woe": -0.03199,
+          "puntos": 37
+        },
+        {
+          "desde": 1.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 81491,
+          "tasa_malos": 0.95076,
+          "woe": -1.735425,
+          "puntos": -6
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_FMX_DEUDA_6M",
+      "coef": -0.122836,
+      "iv": 0.2639,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.11522886343300343,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.55748,
+          "woe": 0.993981,
+          "puntos": 41
+        },
+        {
+          "desde": 0.11522886343300343,
+          "hasta": 0.1337093859910965,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.60227,
+          "woe": 0.809986,
+          "puntos": 40
+        },
+        {
+          "desde": 0.1337093859910965,
+          "hasta": 0.14353131875395775,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.63363,
+          "woe": 0.677124,
+          "puntos": 40
+        },
+        {
+          "desde": 0.14353131875395775,
+          "hasta": 0.15538973733782768,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.67853,
+          "woe": 0.477887,
+          "puntos": 39
+        },
+        {
+          "desde": 0.15538973733782768,
+          "hasta": 0.1599503606557846,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.72545,
+          "woe": 0.253284,
+          "puntos": 39
+        },
+        {
+          "desde": 0.1599503606557846,
+          "hasta": 0.1642196699976921,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.74271,
+          "woe": 0.164854,
+          "puntos": 38
+        },
+        {
+          "desde": 0.1642196699976921,
+          "hasta": 0.1684105098247528,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.77404,
+          "woe": -0.006291,
+          "puntos": 38
+        },
+        {
+          "desde": 0.1684105098247528,
+          "hasta": 0.17768393456935883,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.80358,
+          "woe": -0.183906,
+          "puntos": 37
+        },
+        {
+          "desde": 0.17768393456935883,
+          "hasta": 0.1829669326543808,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.8242,
+          "woe": -0.32012,
+          "puntos": 36
+        },
+        {
+          "desde": 0.1829669326543808,
+          "hasta": 0.18913936614990234,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.82871,
+          "woe": -0.351534,
+          "puntos": 36
+        },
+        {
+          "desde": 0.18913936614990234,
+          "hasta": 0.2061614990234375,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.83967,
+          "woe": -0.430815,
+          "puntos": 36
+        },
+        {
+          "desde": 0.2061614990234375,
+          "hasta": 0.21849368885159492,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.84642,
+          "woe": -0.481776,
+          "puntos": 36
+        },
+        {
+          "desde": 0.21849368885159492,
+          "hasta": 0.2356603741645813,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.84868,
+          "woe": -0.499312,
+          "puntos": 36
+        },
+        {
+          "desde": 0.2356603741645813,
+          "hasta": null,
+          "nulo": false,
+          "n": 151811,
+          "tasa_malos": 0.85785,
+          "woe": -0.572612,
+          "puntos": 36
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_RSI_DEUDA_3M",
+      "coef": -0.233585,
+      "iv": 0.2002,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.0,
+          "nulo": false,
+          "n": 184794,
+          "tasa_malos": 0.67133,
+          "woe": 0.510704,
+          "puntos": 41
+        },
+        {
+          "desde": 0.0,
+          "hasta": 17.871296882629395,
+          "nulo": false,
+          "n": 42923,
+          "tasa_malos": 0.70046,
+          "woe": 0.375428,
+          "puntos": 40
+        },
+        {
+          "desde": 17.871296882629395,
+          "hasta": 31.734230041503906,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.71515,
+          "woe": 0.304422,
+          "puntos": 40
+        },
+        {
+          "desde": 31.734230041503906,
+          "hasta": 44.89456558227539,
+          "nulo": false,
+          "n": 37954,
+          "tasa_malos": 0.72994,
+          "woe": 0.230644,
+          "puntos": 39
+        },
+        {
+          "desde": 44.89456558227539,
+          "hasta": 70.93107604980469,
+          "nulo": false,
+          "n": 75904,
+          "tasa_malos": 0.75746,
+          "woe": 0.086144,
+          "puntos": 38
+        },
+        {
+          "desde": 70.93107604980469,
+          "hasta": 84.15782737731934,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.77946,
+          "woe": -0.037591,
+          "puntos": 37
+        },
+        {
+          "desde": 84.15782737731934,
+          "hasta": 96.8752365112305,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.79865,
+          "woe": -0.15289,
+          "puntos": 37
+        },
+        {
+          "desde": 96.8752365112305,
+          "hasta": null,
+          "nulo": false,
+          "n": 303622,
+          "tasa_malos": 0.85744,
+          "woe": -0.569249,
+          "puntos": 34
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_TEN_ENT_12M",
+      "coef": -0.20256,
+      "iv": 0.1965,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.6666666865348816,
+          "nulo": false,
+          "n": 46346,
+          "tasa_malos": 0.65583,
+          "woe": 0.58017,
+          "puntos": 41
+        },
+        {
+          "desde": 0.6666666865348816,
+          "hasta": 1.0,
+          "nulo": false,
+          "n": 256759,
+          "tasa_malos": 0.69512,
+          "woe": 0.400737,
+          "puntos": 40
+        },
+        {
+          "desde": 1.0,
+          "hasta": 1.5,
+          "nulo": false,
+          "n": 106600,
+          "tasa_malos": 0.77709,
+          "woe": -0.023872,
+          "puntos": 37
+        },
+        {
+          "desde": 1.5,
+          "hasta": 2.0,
+          "nulo": false,
+          "n": 120440,
+          "tasa_malos": 0.79837,
+          "woe": -0.151227,
+          "puntos": 37
+        },
+        {
+          "desde": 2.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 60747,
+          "tasa_malos": 0.86411,
+          "woe": -0.624879,
+          "puntos": 34
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 168164,
+          "tasa_malos": 0.87019,
+          "woe": -0.677728,
+          "puntos": 34
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_VAR_DEUDA_1M",
+      "coef": -0.433071,
+      "iv": 0.1956,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": -0.2139964163303375,
+          "nulo": false,
+          "n": 37579,
+          "tasa_malos": 0.56917,
+          "woe": 0.946436,
+          "puntos": 49
+        },
+        {
+          "desde": -0.2139964163303375,
+          "hasta": -0.12923335731029512,
+          "nulo": false,
+          "n": 37579,
+          "tasa_malos": 0.61311,
+          "woe": 0.764527,
+          "puntos": 47
+        },
+        {
+          "desde": -0.12923335731029512,
+          "hasta": -0.08867542892694472,
+          "nulo": false,
+          "n": 37579,
+          "tasa_malos": 0.64677,
+          "woe": 0.620054,
+          "puntos": 45
+        },
+        {
+          "desde": -0.08867542892694472,
+          "hasta": -0.06352900266647336,
+          "nulo": false,
+          "n": 37579,
+          "tasa_malos": 0.67708,
+          "woe": 0.484547,
+          "puntos": 44
+        },
+        {
+          "desde": -0.06352900266647336,
+          "hasta": -0.030467688664793966,
+          "nulo": false,
+          "n": 75157,
+          "tasa_malos": 0.72345,
+          "woe": 0.263309,
+          "puntos": 41
+        },
+        {
+          "desde": -0.030467688664793966,
+          "hasta": -0.00971512645483016,
+          "nulo": false,
+          "n": 75158,
+          "tasa_malos": 0.79378,
+          "woe": -0.122934,
+          "puntos": 36
+        },
+        {
+          "desde": -0.00971512645483016,
+          "hasta": 0.0027337740175426006,
+          "nulo": false,
+          "n": 37580,
+          "tasa_malos": 0.79832,
+          "woe": -0.150888,
+          "puntos": 36
+        },
+        {
+          "desde": 0.0027337740175426006,
+          "hasta": null,
+          "nulo": false,
+          "n": 413366,
+          "tasa_malos": 0.82909,
+          "woe": -0.354246,
+          "puntos": 33
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 7479,
+          "tasa_malos": 0.77136,
+          "woe": 0.009112,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_RCM_ULTIMA_ALTA_12M",
+      "coef": -0.221944,
+      "iv": 0.0983,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 4.0,
+          "nulo": false,
+          "n": 422631,
+          "tasa_malos": 0.8115,
+          "woe": -0.234838,
+          "puntos": 36
+        },
+        {
+          "desde": 4.0,
+          "hasta": 5.0,
+          "nulo": false,
+          "n": 50825,
+          "tasa_malos": 0.80153,
+          "woe": -0.170965,
+          "puntos": 37
+        },
+        {
+          "desde": 5.0,
+          "hasta": 6.0,
+          "nulo": false,
+          "n": 40044,
+          "tasa_malos": 0.78356,
+          "woe": -0.061599,
+          "puntos": 37
+        },
+        {
+          "desde": 6.0,
+          "hasta": 8.0,
+          "nulo": false,
+          "n": 60030,
+          "tasa_malos": 0.75659,
+          "woe": 0.09087,
+          "puntos": 38
+        },
+        {
+          "desde": 8.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 59134,
+          "tasa_malos": 0.72703,
+          "woe": 0.245342,
+          "puntos": 39
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 126392,
+          "tasa_malos": 0.65832,
+          "woe": 0.569079,
+          "puntos": 41
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_PCT_DEUDA_PNFC_1M",
+      "coef": -0.593365,
+      "iv": 0.0971,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.0,
+          "nulo": false,
+          "n": 278580,
+          "tasa_malos": 0.70762,
+          "woe": 0.341041,
+          "puntos": 43
+        },
+        {
+          "desde": 0.0,
+          "hasta": 0.029720062389969826,
+          "nulo": false,
+          "n": 62995,
+          "tasa_malos": 0.78262,
+          "woe": -0.056048,
+          "puntos": 37
+        },
+        {
+          "desde": 0.029720062389969826,
+          "hasta": 0.050911225378513336,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.78666,
+          "woe": -0.079935,
+          "puntos": 36
+        },
+        {
+          "desde": 0.050911225378513336,
+          "hasta": 0.07831520773470402,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.78734,
+          "woe": -0.084022,
+          "puntos": 36
+        },
+        {
+          "desde": 0.07831520773470402,
+          "hasta": 0.16940493881702423,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.79287,
+          "woe": -0.117393,
+          "puntos": 36
+        },
+        {
+          "desde": 0.16940493881702423,
+          "hasta": 0.24839156866073608,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.80368,
+          "woe": -0.184481,
+          "puntos": 34
+        },
+        {
+          "desde": 0.24839156866073608,
+          "hasta": 0.36698585003614426,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.80837,
+          "woe": -0.214478,
+          "puntos": 34
+        },
+        {
+          "desde": 0.36698585003614426,
+          "hasta": 0.8897623717784888,
+          "nulo": false,
+          "n": 75905,
+          "tasa_malos": 0.81444,
+          "woe": -0.254177,
+          "puntos": 33
+        },
+        {
+          "desde": 0.8897623717784888,
+          "hasta": null,
+          "nulo": false,
+          "n": 113859,
+          "tasa_malos": 0.85493,
+          "woe": -0.548833,
+          "puntos": 28
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_VAL_EDAD_1M",
+      "coef": -0.523789,
+      "iv": 0.0659,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 22.0,
+          "nulo": false,
+          "n": 45945,
+          "tasa_malos": 0.85137,
+          "woe": -0.520381,
+          "puntos": 30
+        },
+        {
+          "desde": 22.0,
+          "hasta": 27.0,
+          "nulo": false,
+          "n": 84577,
+          "tasa_malos": 0.8232,
+          "woe": -0.313259,
+          "puntos": 33
+        },
+        {
+          "desde": 27.0,
+          "hasta": 30.0,
+          "nulo": false,
+          "n": 58297,
+          "tasa_malos": 0.81639,
+          "woe": -0.26712,
+          "puntos": 34
+        },
+        {
+          "desde": 30.0,
+          "hasta": 32.0,
+          "nulo": false,
+          "n": 39973,
+          "tasa_malos": 0.80242,
+          "woe": -0.176508,
+          "puntos": 35
+        },
+        {
+          "desde": 32.0,
+          "hasta": 34.0,
+          "nulo": false,
+          "n": 41265,
+          "tasa_malos": 0.79765,
+          "woe": -0.14671,
+          "puntos": 35
+        },
+        {
+          "desde": 34.0,
+          "hasta": 36.0,
+          "nulo": false,
+          "n": 39537,
+          "tasa_malos": 0.79123,
+          "woe": -0.10742,
+          "puntos": 36
+        },
+        {
+          "desde": 36.0,
+          "hasta": 38.0,
+          "nulo": false,
+          "n": 37838,
+          "tasa_malos": 0.79111,
+          "woe": -0.106668,
+          "puntos": 36
+        },
+        {
+          "desde": 38.0,
+          "hasta": 44.0,
+          "nulo": false,
+          "n": 104615,
+          "tasa_malos": 0.77476,
+          "woe": -0.010431,
+          "puntos": 37
+        },
+        {
+          "desde": 44.0,
+          "hasta": 47.0,
+          "nulo": false,
+          "n": 48474,
+          "tasa_malos": 0.75865,
+          "woe": 0.079626,
+          "puntos": 39
+        },
+        {
+          "desde": 47.0,
+          "hasta": 52.0,
+          "nulo": false,
+          "n": 66326,
+          "tasa_malos": 0.74659,
+          "woe": 0.14445,
+          "puntos": 40
+        },
+        {
+          "desde": 52.0,
+          "hasta": 56.0,
+          "nulo": false,
+          "n": 42801,
+          "tasa_malos": 0.73554,
+          "woe": 0.202007,
+          "puntos": 41
+        },
+        {
+          "desde": 56.0,
+          "hasta": 65.0,
+          "nulo": false,
+          "n": 70830,
+          "tasa_malos": 0.71989,
+          "woe": 0.280998,
+          "puntos": 42
+        },
+        {
+          "desde": 65.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 70104,
+          "tasa_malos": 0.69421,
+          "woe": 0.405042,
+          "puntos": 44
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 8474,
+          "tasa_malos": 0.66934,
+          "woe": 0.519794,
+          "puntos": 45
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_RAT_CURA_12M",
+      "coef": -0.125859,
+      "iv": 0.0541,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.0,
+          "nulo": false,
+          "n": 295460,
+          "tasa_malos": 0.81931,
+          "woe": -0.286776,
+          "puntos": 37
+        },
+        {
+          "desde": 0.0,
+          "hasta": 0.6666666865348816,
+          "nulo": false,
+          "n": 140098,
+          "tasa_malos": 0.75471,
+          "woe": 0.101005,
+          "puntos": 38
+        },
+        {
+          "desde": 0.6666666865348816,
+          "hasta": null,
+          "nulo": false,
+          "n": 47802,
+          "tasa_malos": 0.67922,
+          "woe": 0.474747,
+          "puntos": 39
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 275696,
+          "tasa_malos": 0.74872,
+          "woe": 0.133122,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_AVG_PCT_DEUDA_IRR_3M",
+      "coef": -0.242672,
+      "iv": 0.0406,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 0.018351938109844923,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.65207,
+          "woe": 0.59678,
+          "puntos": 42
+        },
+        {
+          "desde": 0.018351938109844923,
+          "hasta": 0.041072048246860504,
+          "nulo": false,
+          "n": 37953,
+          "tasa_malos": 0.72097,
+          "woe": 0.275659,
+          "puntos": 40
+        },
+        {
+          "desde": 0.041072048246860504,
+          "hasta": 0.10339248925447464,
+          "nulo": false,
+          "n": 75906,
+          "tasa_malos": 0.74984,
+          "woe": 0.127195,
+          "puntos": 39
+        },
+        {
+          "desde": 0.10339248925447464,
+          "hasta": 0.3333333432674408,
+          "nulo": false,
+          "n": 319083,
+          "tasa_malos": 0.76927,
+          "woe": 0.02074,
+          "puntos": 38
+        },
+        {
+          "desde": 0.3333333432674408,
+          "hasta": null,
+          "nulo": false,
+          "n": 288161,
+          "tasa_malos": 0.80582,
+          "woe": -0.198181,
+          "puntos": 36
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    },
+    {
+      "nombre": "CEN_CNT_MESES_SIT2P_3M",
+      "coef": -1.716456,
+      "iv": 0.0321,
+      "bins": [
+        {
+          "desde": null,
+          "hasta": 1.0,
+          "nulo": false,
+          "n": 357959,
+          "tasa_malos": 0.73966,
+          "woe": 0.180727,
+          "puntos": 47
+        },
+        {
+          "desde": 1.0,
+          "hasta": null,
+          "nulo": false,
+          "n": 401097,
+          "tasa_malos": 0.80262,
+          "woe": -0.177826,
+          "puntos": 29
+        },
+        {
+          "desde": null,
+          "hasta": null,
+          "nulo": true,
+          "n": 0,
+          "tasa_malos": null,
+          "woe": 0.0,
+          "puntos": 38
+        }
+      ]
+    }
+  ],
+  "metricas": {
+    "train": {
+      "n": 759056,
+      "tasa": 0.77293,
+      "gini": 0.4806,
+      "ks": 0.357
+    },
+    "test": {
+      "n": 325813,
+      "tasa": 0.77157,
+      "gini": 0.4824,
+      "ks": 0.3586
+    },
+    "oot": {
+      "n": 512147,
+      "tasa": 0.73678,
+      "gini": 0.4631,
+      "ks": 0.3409
+    },
+    "por_fecha": [
+      {
+        "obs": 202510,
+        "muestra": "desarrollo",
+        "n": 275007,
+        "tasa": 0.79098,
+        "gini": 0.4833,
+        "ks": 0.361,
+        "psi_score": 0.0079
+      },
+      {
+        "obs": 202511,
+        "muestra": "desarrollo",
+        "n": 294593,
+        "tasa": 0.75824,
+        "gini": 0.4824,
+        "ks": 0.3593,
+        "psi_score": 0.001
+      },
+      {
+        "obs": 202512,
+        "muestra": "desarrollo",
+        "n": 267174,
+        "tasa": 0.77508,
+        "gini": 0.4788,
+        "ks": 0.3531,
+        "psi_score": 0.0009
+      },
+      {
+        "obs": 202601,
+        "muestra": "desarrollo",
+        "n": 248095,
+        "tasa": 0.76625,
+        "gini": 0.4789,
+        "ks": 0.3543,
+        "psi_score": 0.0092
+      },
+      {
+        "obs": 202602,
+        "muestra": "fuera de muestra",
+        "n": 255461,
+        "tasa": 0.7422,
+        "gini": 0.4629,
+        "ks": 0.341,
+        "psi_score": 0.0221
+      },
+      {
+        "obs": 202603,
+        "muestra": "fuera de muestra",
+        "n": 256686,
+        "tasa": 0.73139,
+        "gini": 0.4632,
+        "ks": 0.3414,
+        "psi_score": 0.0303
+      }
+    ]
+  },
+  "seleccion": [
+    {
+      "variable": "CEN_RSI_DEUDA_12M",
+      "iv": 0.3903,
+      "resultado": "elegida",
+      "gini_test": 0.344
+    },
+    {
+      "variable": "CEN_FMX_DEUDA_12M",
+      "iv": 0.3251,
+      "resultado": "descartada",
+      "motivo": "correlación 0.79 con CEN_RSI_DEUDA_12M"
+    },
+    {
+      "variable": "CEN_RSI_DEUDA_6M",
+      "iv": 0.3155,
+      "resultado": "descartada",
+      "motivo": "correlación 0.73 con CEN_RSI_DEUDA_12M"
+    },
+    {
+      "variable": "CEN_PND_DEUDA_12M",
+      "iv": 0.2846,
+      "resultado": "descartada",
+      "motivo": "correlación 0.83 con CEN_RSI_DEUDA_12M"
+    },
+    {
+      "variable": "CEN_CNT_ENT_EMPEORA_3M",
+      "iv": 0.2749,
+      "resultado": "elegida",
+      "gini_test": 0.4018
+    },
+    {
+      "variable": "CEN_FMX_DEUDA_6M",
+      "iv": 0.2639,
+      "resultado": "elegida",
+      "gini_test": 0.4144
+    },
+    {
+      "variable": "CEN_TEN_DEUDA_12M",
+      "iv": 0.261,
+      "resultado": "descartada",
+      "motivo": "correlación 0.81 con CEN_RSI_DEUDA_12M"
+    },
+    {
+      "variable": "CEN_TEN_DEUDA_6M",
+      "iv": 0.2384,
+      "resultado": "descartada",
+      "motivo": "correlación 0.88 con CEN_FMX_DEUDA_6M"
+    },
+    {
+      "variable": "CEN_PND_DEUDA_6M",
+      "iv": 0.2309,
+      "resultado": "descartada",
+      "motivo": "correlación 0.88 con CEN_FMX_DEUDA_6M"
+    },
+    {
+      "variable": "CEN_FMX_DEUDA_3M",
+      "iv": 0.2223,
+      "resultado": "descartada",
+      "motivo": "correlación 0.73 con CEN_FMX_DEUDA_6M"
+    },
+    {
+      "variable": "CEN_TEN_DEUDA_3M",
+      "iv": 0.2199,
+      "resultado": "descartada",
+      "motivo": "correlación 0.73 con CEN_FMX_DEUDA_6M"
+    },
+    {
+      "variable": "CEN_CNT_ENT_SIT2P_1M",
+      "iv": 0.2074,
+      "resultado": "descartada",
+      "motivo": "correlación 0.81 con CEN_CNT_ENT_EMPEORA_3M"
+    },
+    {
+      "variable": "CEN_FLG_ALERTA_CONTAGIO_3M",
+      "iv": 0.2016,
+      "resultado": "descartada",
+      "motivo": "correlación 0.91 con CEN_CNT_ENT_EMPEORA_3M"
+    },
+    {
+      "variable": "CEN_RSI_DEUDA_3M",
+      "iv": 0.2002,
+      "resultado": "elegida",
+      "gini_test": 0.4188
+    },
+    {
+      "variable": "CEN_TEN_ENT_12M",
+      "iv": 0.1965,
+      "resultado": "elegida",
+      "gini_test": 0.4242
+    },
+    {
+      "variable": "CEN_VAR_DEUDA_1M",
+      "iv": 0.1956,
+      "resultado": "elegida",
+      "gini_test": 0.4284
+    },
+    {
+      "variable": "CEN_FMX_ENT_12M",
+      "iv": 0.1883,
+      "resultado": "descartada",
+      "motivo": "correlación 0.83 con CEN_TEN_ENT_12M"
+    },
+    {
+      "variable": "CEN_AVG_VAR_DEUDA_6M",
+      "iv": 0.1781,
+      "resultado": "descartada",
+      "motivo": "correlación 0.77 con CEN_FMX_DEUDA_6M"
+    },
+    {
+      "variable": "CEN_RSI_ENT_12M",
+      "iv": 0.176,
+      "resultado": "descartada",
+      "motivo": "correlación 0.86 con CEN_TEN_ENT_12M"
+    },
+    {
+      "variable": "CEN_CV_DEUDA_12M",
+      "iv": 0.1305,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RSI_DEUDA_IRR_3M",
+      "iv": 0.1217,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_AVG_VAR_DEUDA_12M",
+      "iv": 0.1159,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_TEN_ENT_6M",
+      "iv": 0.1134,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0000)"
+    },
+    {
+      "variable": "CEN_RCM_PRIMERA_APARICION_12M",
+      "iv": 0.1107,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RSI_ENT_6M",
+      "iv": 0.1053,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0001)"
+    },
+    {
+      "variable": "CEN_DIF_SIT_12M",
+      "iv": 0.1051,
+      "resultado": "descartada",
+      "motivo": "correlación 0.74 con CEN_TEN_ENT_12M"
+    },
+    {
+      "variable": "CEN_TEN_DEUDA_IRR_3M",
+      "iv": 0.1051,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RSI_DEUDA_IRR_6M",
+      "iv": 0.1043,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_CNT_MESES_PRESENTE_12M",
+      "iv": 0.1022,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (-0.0000)"
+    },
+    {
+      "variable": "CEN_MOD_SIT_12M",
+      "iv": 0.1004,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RCM_ULTIMA_ALTA_12M",
+      "iv": 0.0983,
+      "resultado": "elegida",
+      "gini_test": 0.4306
+    },
+    {
+      "variable": "CEN_PCT_DEUDA_PNFC_1M",
+      "iv": 0.0971,
+      "resultado": "elegida",
+      "gini_test": 0.4424
+    },
+    {
+      "variable": "CEN_RSI_DEUDA_IRR_12M",
+      "iv": 0.0947,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_CNT_ENT_PNFC_1M",
+      "iv": 0.0892,
+      "resultado": "descartada",
+      "motivo": "correlación 0.83 con CEN_PCT_DEUDA_PNFC_1M"
+    },
+    {
+      "variable": "CEN_CNT_ALTAS_12M",
+      "iv": 0.0827,
+      "resultado": "descartada",
+      "motivo": "correlación 0.88 con CEN_RCM_ULTIMA_ALTA_12M"
+    },
+    {
+      "variable": "CEN_FMX_ENT_6M",
+      "iv": 0.082,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_CNT_ALTAS_6M",
+      "iv": 0.0807,
+      "resultado": "descartada",
+      "motivo": "correlación 0.83 con CEN_RCM_ULTIMA_ALTA_12M"
+    },
+    {
+      "variable": "CEN_CNT_ALERTAS_1M",
+      "iv": 0.0786,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_DIF_SIT_6M",
+      "iv": 0.0774,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_TEN_DEUDA_PNFC_6M",
+      "iv": 0.0699,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0002)"
+    },
+    {
+      "variable": "CEN_AVG_ENT_12M",
+      "iv": 0.0697,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_VAL_EDAD_1M",
+      "iv": 0.0659,
+      "resultado": "elegida",
+      "gini_test": 0.4481
+    },
+    {
+      "variable": "CEN_RSI_SIT_3M",
+      "iv": 0.0571,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RSI_SIT_6M",
+      "iv": 0.0571,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_TEN_DEUDA_IRR_6M",
+      "iv": 0.0552,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_DIF_SIT_3M",
+      "iv": 0.0548,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RAT_CURA_12M",
+      "iv": 0.0541,
+      "resultado": "elegida",
+      "gini_test": 0.4662
+    },
+    {
+      "variable": "CEN_FLG_ALERTA_DETERIORO_3M",
+      "iv": 0.0484,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_CNT_MESES_SIT2P_6M",
+      "iv": 0.046,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RSI_SIT_12M",
+      "iv": 0.0438,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_CNT_MESES_SIT2P_12M",
+      "iv": 0.0437,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_CNT_RACHA_SIT2P_1M",
+      "iv": 0.0426,
+      "resultado": "descartada",
+      "motivo": "correlación 0.77 con CEN_RAT_CURA_12M"
+    },
+    {
+      "variable": "CEN_PCT_DEUDA_BANCO_1M",
+      "iv": 0.0414,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0000)"
+    },
+    {
+      "variable": "CEN_AVG_PCT_DEUDA_IRR_3M",
+      "iv": 0.0406,
+      "resultado": "elegida",
+      "gini_test": 0.47
+    },
+    {
+      "variable": "CEN_AVG_PCT_DEUDA_IRR_6M",
+      "iv": 0.0397,
+      "resultado": "descartada",
+      "motivo": "correlación 0.89 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_AVG_SIT_POND_3M",
+      "iv": 0.0394,
+      "resultado": "descartada",
+      "motivo": "correlación 1.00 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_AVG_DEUDA_12M",
+      "iv": 0.0391,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_AVG_SIT_POND_6M",
+      "iv": 0.0389,
+      "resultado": "descartada",
+      "motivo": "correlación 0.89 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_FLG_ALERTA_SOBREENDEUDAMIENTO_6M",
+      "iv": 0.0371,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0001)"
+    },
+    {
+      "variable": "CEN_AVG_ENT_6M",
+      "iv": 0.0344,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_AVG_PCT_DEUDA_IRR_12M",
+      "iv": 0.034,
+      "resultado": "descartada",
+      "motivo": "correlación 0.82 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_PCT_DEUDA_IRR_1M",
+      "iv": 0.0339,
+      "resultado": "descartada",
+      "motivo": "correlación 0.81 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_AVG_SIT_POND_1M",
+      "iv": 0.0339,
+      "resultado": "descartada",
+      "motivo": "correlación 0.81 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_CV_DEUDA_6M",
+      "iv": 0.0336,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_MAX_SIT_NO_BANCARIA_12M",
+      "iv": 0.0336,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0005)"
+    },
+    {
+      "variable": "CEN_AVG_SIT_POND_12M",
+      "iv": 0.0335,
+      "resultado": "descartada",
+      "motivo": "correlación 0.82 con CEN_AVG_PCT_DEUDA_IRR_3M"
+    },
+    {
+      "variable": "CEN_CNT_MEJORA_12M",
+      "iv": 0.0333,
+      "resultado": "descartada",
+      "motivo": "signo invertido"
+    },
+    {
+      "variable": "CEN_RAT_ROLL_2A3_12M",
+      "iv": 0.0326,
+      "resultado": "descartada",
+      "motivo": "no suma AUC (+0.0009)"
+    },
+    {
+      "variable": "CEN_CNT_MESES_SIT2P_3M",
+      "iv": 0.0321,
+      "resultado": "elegida",
+      "gini_test": 0.4824
+    }
+  ],
+  "iv_todas": {
+    "CEN_RSI_DEUDA_12M": 0.3903,
+    "CEN_FMX_DEUDA_12M": 0.3251,
+    "CEN_RSI_DEUDA_6M": 0.3155,
+    "CEN_PND_DEUDA_12M": 0.2846,
+    "CEN_CNT_ENT_EMPEORA_3M": 0.2749,
+    "CEN_FMX_DEUDA_6M": 0.2639,
+    "CEN_TEN_DEUDA_12M": 0.261,
+    "CEN_TEN_DEUDA_6M": 0.2384,
+    "CEN_PND_DEUDA_6M": 0.2309,
+    "CEN_FMX_DEUDA_3M": 0.2223,
+    "CEN_TEN_DEUDA_3M": 0.2199,
+    "CEN_CNT_ENT_SIT2P_1M": 0.2074,
+    "CEN_FLG_ALERTA_CONTAGIO_3M": 0.2016,
+    "CEN_RSI_DEUDA_3M": 0.2002,
+    "CEN_TEN_ENT_12M": 0.1965,
+    "CEN_VAR_DEUDA_1M": 0.1956,
+    "CEN_FMX_ENT_12M": 0.1883,
+    "CEN_AVG_VAR_DEUDA_6M": 0.1781,
+    "CEN_RSI_ENT_12M": 0.176,
+    "CEN_CV_DEUDA_12M": 0.1305,
+    "CEN_RSI_DEUDA_IRR_3M": 0.1217,
+    "CEN_AVG_VAR_DEUDA_12M": 0.1159,
+    "CEN_TEN_ENT_6M": 0.1134,
+    "CEN_RCM_PRIMERA_APARICION_12M": 0.1107,
+    "CEN_RSI_ENT_6M": 0.1053,
+    "CEN_DIF_SIT_12M": 0.1051,
+    "CEN_TEN_DEUDA_IRR_3M": 0.1051,
+    "CEN_RSI_DEUDA_IRR_6M": 0.1043,
+    "CEN_CNT_MESES_PRESENTE_12M": 0.1022,
+    "CEN_MOD_SIT_12M": 0.1004,
+    "CEN_RCM_ULTIMA_ALTA_12M": 0.0983,
+    "CEN_PCT_DEUDA_PNFC_1M": 0.0971,
+    "CEN_RSI_DEUDA_IRR_12M": 0.0947,
+    "CEN_CNT_ENT_PNFC_1M": 0.0892,
+    "CEN_CNT_ALTAS_12M": 0.0827,
+    "CEN_FMX_ENT_6M": 0.082,
+    "CEN_CNT_ALTAS_6M": 0.0807,
+    "CEN_CNT_ALERTAS_1M": 0.0786,
+    "CEN_DIF_SIT_6M": 0.0774,
+    "CEN_TEN_DEUDA_PNFC_6M": 0.0699,
+    "CEN_AVG_ENT_12M": 0.0697,
+    "CEN_VAL_EDAD_1M": 0.0659,
+    "CEN_RSI_SIT_3M": 0.0571,
+    "CEN_RSI_SIT_6M": 0.0571,
+    "CEN_TEN_DEUDA_IRR_6M": 0.0552,
+    "CEN_DIF_SIT_3M": 0.0548,
+    "CEN_RAT_CURA_12M": 0.0541,
+    "CEN_FLG_ALERTA_DETERIORO_3M": 0.0484,
+    "CEN_CNT_MESES_SIT2P_6M": 0.046,
+    "CEN_RSI_SIT_12M": 0.0438,
+    "CEN_CNT_MESES_SIT2P_12M": 0.0437,
+    "CEN_CNT_RACHA_SIT2P_1M": 0.0426,
+    "CEN_PCT_DEUDA_BANCO_1M": 0.0414,
+    "CEN_AVG_PCT_DEUDA_IRR_3M": 0.0406,
+    "CEN_AVG_PCT_DEUDA_IRR_6M": 0.0397,
+    "CEN_AVG_SIT_POND_3M": 0.0394,
+    "CEN_AVG_DEUDA_12M": 0.0391,
+    "CEN_AVG_SIT_POND_6M": 0.0389,
+    "CEN_FLG_ALERTA_SOBREENDEUDAMIENTO_6M": 0.0371,
+    "CEN_AVG_ENT_6M": 0.0344,
+    "CEN_AVG_PCT_DEUDA_IRR_12M": 0.034,
+    "CEN_PCT_DEUDA_IRR_1M": 0.0339,
+    "CEN_AVG_SIT_POND_1M": 0.0339,
+    "CEN_CV_DEUDA_6M": 0.0336,
+    "CEN_MAX_SIT_NO_BANCARIA_12M": 0.0336,
+    "CEN_AVG_SIT_POND_12M": 0.0335,
+    "CEN_CNT_MEJORA_12M": 0.0333,
+    "CEN_RAT_ROLL_2A3_12M": 0.0326,
+    "CEN_CNT_MESES_SIT2P_3M": 0.0321,
+    "CEN_MAX_SIT_BANCARIA_12M": 0.0318,
+    "CEN_MAX_RACHA_SIT2P_12M": 0.0291,
+    "CEN_MAX_DEUDA_12M": 0.0286,
+    "CEN_RCM_SIT3P_12M": 0.024,
+    "CEN_CNT_EMPEORA_12M": 0.0237,
+    "CEN_CNT_ENT_1M": 0.0215,
+    "CEN_CNT_ENT_BANCO_1M": 0.0214,
+    "CEN_TEN_DEUDA_IRR_12M": 0.0203,
+    "CEN_MAX_DEUDA_6M": 0.0193,
+    "CEN_AVG_DEUDA_6M": 0.0189,
+    "CEN_CNT_MEJORA_6M": 0.0174,
+    "CEN_MTO_DEUDA_IRR_1M": 0.0154,
+    "CEN_FLG_ACTIVIDAD_ARCA_1M": 0.0151,
+    "CEN_MAX_SIT_6M": 0.0143,
+    "CEN_MAX_ENT_6M": 0.0142,
+    "CEN_CNT_ALTAS_3M": 0.014,
+    "CEN_FLG_SOLO_NO_BANCARIA_1M": 0.0139,
+    "CEN_IDX_HHI_1M": 0.0131,
+    "CEN_CNT_MESES_SIT3P_12M": 0.0118,
+    "CEN_MAX_DEUDA_3M": 0.0117,
+    "CEN_MAX_SIT_12M": 0.0112,
+    "CEN_RCM_PEOR_SIT_12M": 0.0112,
+    "CEN_FLG_PEOR_MOMENTO_1M": 0.0112,
+    "CEN_CNT_ENT_SIT3P_12M": 0.0112,
+    "CEN_TEN_ENT_3M": 0.0108,
+    "CEN_CNT_ENT_DISTINTAS_12M": 0.0108,
+    "CEN_PCT_DEUDA_TARJETA_NB_1M": 0.0108,
+    "CEN_PCT_DEUDA_CIA_FIN_1M": 0.0107,
+    "CEN_FLG_ALERTA_REINCIDENCIA_12M": 0.0103,
+    "CEN_MAX_ENT_12M": 0.0102,
+    "CEN_AVG_DEUDA_IRR_3M": 0.0101,
+    "CEN_MAX_DEUDA_IRR_3M": 0.0097,
+    "CEN_AVG_DEUDA_3M": 0.0095,
+    "CEN_CNT_ENT_TARJETA_NB_1M": 0.0094,
+    "CEN_RSI_ENT_3M": 0.0093,
+    "CEN_FMX_ENT_3M": 0.0091,
+    "CEN_RAT_PRINCIPALIDAD_1M": 0.0089,
+    "CEN_CNT_TIPOS_ENT_1M": 0.0083,
+    "CEN_CNT_BAJAS_12M": 0.0078,
+    "CEN_MAX_DEUDA_IRR_6M": 0.0068,
+    "CEN_CNT_BAJAS_3M": 0.0062,
+    "CEN_VAL_ANTIG_EMPRESA_1M": 0.0056,
+    "CEN_CNT_BAJAS_6M": 0.0055,
+    "CEN_IDX_ENTROPIA_TIPO_1M": 0.0055,
+    "CEN_MTO_DEUDA_1M": 0.0048,
+    "CEN_MAX_DEUDA_IRR_12M": 0.0046,
+    "CEN_AVG_DEUDA_IRR_6M": 0.0038,
+    "CEN_AVG_DEUDA_IRR_12M": 0.002,
+    "CEN_CNT_CAMBIO_PRINC_12M": 0.002,
+    "CEN_CNT_CAMBIO_PRINC_6M": 0.0019,
+    "CEN_CNT_HUECOS_12M": 0.0016,
+    "CEN_IDX_ENTROPIA_TIPO_6M": 0.0015,
+    "CEN_FLG_ALERTA_REFUGIO_NO_BANCARIO_6M": 0.001
+  }
+}

@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from . import pipeline, scorecard, scoring
+from . import pipeline, s3, scorecard, scoring, v2
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -35,6 +35,50 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("scorear", help="aplica el scorecard a un Parquet de variables")
     p.add_argument("variables"); p.add_argument("modelo_json"); p.add_argument("salida")
 
+    p = sub.add_parser("base", help="v2: base limpia (24DSF + mensual, equivalencias, IPC) por período y bucket")
+    p.add_argument("dir_24dsf"); p.add_argument("salida")
+    p.add_argument("--ipc", default="referencias/ipc.csv"); p.add_argument("--referencias", default="referencias")
+    p.add_argument("--mensual"); p.add_argument("--padron"); p.add_argument("--uno-dsf")
+    p.add_argument("--base-ipc", type=int, help="período de los pesos constantes (default: último del IPC)")
+    p.add_argument("--desde", type=int, help="retomar desde este período (los anteriores ya están escritos)")
+
+    p = sub.add_parser("variables-v2", help="v2: variables del catálogo a una o más fechas de observación")
+    p.add_argument("dir_base"); p.add_argument("salida")
+    p.add_argument("--obs", type=int, nargs="+", required=True)
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--buckets", type=int, nargs="*", help="sólo estos buckets (prueba)")
+    p.add_argument("--retomar", action="store_true", help="saltea las partes ya escritas")
+
+    p = sub.add_parser("catalogo", help="v2: valida el catálogo y muestra el conteo por bloque")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+
+    p = sub.add_parser("documentar", help="v2: genera docs/variables.md y docs/diccionario_variables.csv desde el catálogo")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml"); p.add_argument("--docs", default="docs")
+
+    p = sub.add_parser("poder", help="v2: informe de poder (IV, Gini, KS, PSI, correlaciones, incremental vs v1)")
+    p.add_argument("dir_variables"); p.add_argument("--salida", default="reportes/poder_v2")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--oot", type=int, nargs="*", help="fechas out-of-time (default: las dos últimas)")
+    p.add_argument("--pct-muestra", type=int, default=10)
+    p.add_argument("--vars-v1", help="Parquet de variables v1 para el valor incremental")
+    p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json"); p.add_argument("--obs-v1", type=int, default=202509)
+
+    p = sub.add_parser("pagina-poder", help="v2: arma los CSV de la página del informe de poder")
+    p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--salida", default="reportes/poder_v2/pagina")
+
+    p = sub.add_parser("validar-v2", help="v2: validación multivariada de las variables (ajuste por segmento, fuera de muestra, vs v1)")
+    p.add_argument("dir_variables"); p.add_argument("--salida", default="reportes/validacion_v2")
+    p.add_argument("--catalogo", default="catalogo/variables.yaml")
+    p.add_argument("--vars-v1", nargs="*", default=[], help="OBS=Parquet de variables v1, p. ej. 202603=data/vars_202603_d6.parquet")
+    p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json")
+
+    p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
+    p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
+    p.add_argument("--perfil", default="fmargara")
+    p.add_argument("--renombrar", nargs="*", default=[], help="local=s3, p. ej. data_0.parquet=data.parquet")
+    p.add_argument("--simular", action="store_true", help="sólo muestra qué subiría")
+
     a = ap.parse_args(argv)
     kw = {"memory_limit": a.memoria}
     if a.cmd == "ipc":
@@ -49,6 +93,45 @@ def main(argv: list[str] | None = None) -> None:
         print(pipeline.iv_gini(a.variables, a.resumen, a.bins, **kw).to_string(index=False))
     elif a.cmd == "entrenar":
         scorecard.entrenar(a.variables, a.modelo_json, pct_muestra=a.pct_muestra, max_vars=a.max_vars)
+    elif a.cmd == "base":
+        v2.construir_base(a.dir_24dsf, a.salida, a.ipc, a.referencias, mensual=a.mensual, padron=a.padron,
+                          uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, desde=a.desde, **kw)
+    elif a.cmd == "variables-v2":
+        for obs in a.obs:
+            v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, retomar=a.retomar, **kw)
+    elif a.cmd == "documentar":
+        from pathlib import Path
+        from . import catalogo
+        c = catalogo.cargar(a.catalogo)
+        if c.errores:
+            raise SystemExit("\n".join(c.errores))
+        print(catalogo.escribir_diccionario(c, Path(a.docs) / "diccionario_variables.csv"))
+        print(catalogo.escribir_documento(c, Path(a.docs) / "variables.md"))
+    elif a.cmd == "poder":
+        from . import poder
+        r = poder.informe(a.dir_variables, a.catalogo, a.salida, fechas_oot=a.oot, pct_muestra=a.pct_muestra,
+                          vars_v1=a.vars_v1, modelo_v1=a.modelo_v1 if a.vars_v1 else None, obs_v1=a.obs_v1, memory_limit=a.memoria)
+        print(r.head(25).to_string(index=False))
+    elif a.cmd == "pagina-poder":
+        from . import poder
+        for r in poder.archivos_pagina(a.reporte, a.catalogo, a.salida):
+            print(r)
+    elif a.cmd == "validar-v2":
+        from . import validacion_v2
+        v1 = {int(o): r for o, r in (x.split("=", 1) for x in a.vars_v1)}
+        validacion_v2.validar(a.dir_variables, a.catalogo, a.salida, vars_v1=v1 or None,
+                              modelo_v1=a.modelo_v1 if v1 else None)
+    elif a.cmd == "subir":
+        filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
+        malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]
+        if malos:
+            raise SystemExit(f"{len(malos)} archivos con tamaño distinto")
+    elif a.cmd == "catalogo":
+        from . import catalogo
+        c = catalogo.cargar(a.catalogo)
+        print(f"{len(c.variables)} variables", c.por_bloque())
+        if c.errores:
+            raise SystemExit("\n".join(c.errores))
     elif a.cmd == "scorear":
         scoring.scorear_parquet(a.variables, a.modelo_json, a.salida)
 
