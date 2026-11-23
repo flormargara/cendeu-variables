@@ -80,7 +80,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
 - Corte 202610: bajar los seis paquetes de ARCA a `~/cendeu/entrada` cuando estén (el de 202609 se procesó el 2026-11-05, así que se espera a principios de diciembre); la revisión diaria hace el resto.
 - Actualización mensual, etapa 3 (opcional): correrla en AWS con el rol `data-cendeu`, disparada al llegar los paquetes a `s3://data-cendeu-raw/entrada/AAAAMM/`.
-- Decidir si cada corte recalcula las fechas anteriores (`--recalcular`, ~1,5 h más) o sólo agrega las nuevas (default).
+- Decidir si cada corte recalcula las fechas anteriores (`--recalcular`, ~1,5 h más) o sólo agrega las nuevas (default). Corregido el 2026-11-23: la fecha corte − 6 se rehace siempre, aunque exista, para que la foto armada seis cortes atrás reciba su target (antes quedaba sin target para siempre).
 
 ## Bloques de variables (Fase 2)
 

@@ -114,7 +114,7 @@ cendeu actualizar --datos ~/cendeu/datos --entrada ~/cendeu/entrada
 | `controles` | Totales del BCRA, 24 meses completos, rectificaciones en los meses solapados, mes nuevo contra el anterior, entidades sin tipo, IPC. Con un error frena antes de tocar los datos |
 | `promover` | Reemplaza los meses del corte anterior (los viejos quedan en `_actualizaciones/AAAAMM/reemplazados`) |
 | `base` | Base v2 nueva con el mismo mes base de IPC; el mensual reemplaza al 24DSF sólo en el mes de corte |
-| `variables` | Fechas nuevas: el corte (foto actual, sin target) y corte − 6 (primera con desempeño completo). `--recalcular` rehace también las anteriores con la historia rectificada |
+| `variables` | Fechas nuevas: el corte (foto actual, sin target) y corte − 6 (primera con desempeño completo; se rehace aunque exista, porque se armó como foto y recién ahora lleva target). `--recalcular` rehace también las anteriores con la historia rectificada |
 | `monitoreo` | PSI de cada variable de las fechas nuevas contra la última fecha que ya existía |
 | `subir` | S3 y registro en `_control/` (`--simular-s3` para ver qué subiría) |
 | `resumen` | `reportes/actualizaciones/AAAAMM.md` |
