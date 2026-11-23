@@ -130,3 +130,15 @@ def test_actualizar_frena_si_falta_un_paquete(tmp_path):
     (tmp_path / "entrada").mkdir()
     with pytest.raises(SystemExit, match="incompleto"):
         act.actualizar(CORTE, str(tmp_path / "entrada"), tmp_path / "datos")
+
+
+def test_fechas_a_armar_completa_el_target_de_la_foto():
+    # 202609 se armó como foto (sin target); en el corte 202703 tiene que rehacerse con su desempeño completo
+    existentes = [202509, 202603, 202609, 202610]
+    nuevas, obs = act.fechas_a_armar(202703, existentes)
+    assert nuevas == obs == [202609, 202703]
+    # un corte intermedio arma la foto y la fecha que recién completa su ventana
+    assert act.fechas_a_armar(202610, [202603, 202609]) == ([202604, 202610], [202604, 202610])
+    # recalcular rehace además todas las existentes
+    nuevas, obs = act.fechas_a_armar(202703, existentes, recalcular=True)
+    assert nuevas == [202609, 202703] and obs == [202509, 202603, 202609, 202610, 202703]

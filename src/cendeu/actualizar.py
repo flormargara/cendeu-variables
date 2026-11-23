@@ -345,6 +345,16 @@ def registrar(nombre: str, filas: list[dict], perfil: str = "fmargara", simular:
 
 
 # --------------------------------------------------------------------------- orquestación
+def fechas_a_armar(corte: int, existentes: list[int], recalcular: bool = False) -> tuple[list[int], list[int]]:
+    """Fechas de observación que arma un corte: ``(nuevas, todas)``.
+
+    Las nuevas son siempre dos: el corte (foto actual, sin target) y corte − DESEMPENO (la primera con el desempeño
+    completo). Esa segunda se rehace aunque ya exista, porque normalmente se armó como foto seis cortes atrás y recién
+    ahora puede llevar su target. Con ``recalcular`` se rehacen también todas las fechas existentes."""
+    nuevas = sorted({periodo_mas(corte, -DESEMPENO), corte})
+    return nuevas, sorted(set(nuevas) | (set(existentes) if recalcular else set()))
+
+
 def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str | Path = "referencias",
                catalogo: str | Path = "catalogo/variables.yaml", reportes: str | Path = "reportes/actualizaciones",
                recalcular: bool = False, hasta: str | None = None, rehacer: str | None = None,
@@ -464,8 +474,7 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
         elif paso == "variables" and correr(paso):
             dir_vars = datos / "v2" / "variables"
             existentes = sorted(int(p.name.split("=")[1]) for p in dir_vars.glob("periodo_obs=*"))
-            nuevas = sorted({periodo_mas(corte, -DESEMPENO), corte} - (set() if recalcular else set(existentes)))
-            obs = sorted(set(nuevas) | (set(existentes) if recalcular else set()))
+            nuevas, obs = fechas_a_armar(corte, existentes, recalcular)
             vars_nuevas = trabajo / "variables"
             for o in obs:
                 v2.construir_variables(datos / "v2" / "base", o, vars_nuevas, cat, retomar=True, **kw)
