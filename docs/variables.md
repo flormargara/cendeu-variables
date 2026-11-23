@@ -44,6 +44,7 @@ observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deud
 - **situacion**: Escala 1–5 (la 11 del mensual se trata como 1); 0 = ausente de la central.
 - **historia**: El 24DSF cubre 24 meses. Para la primera fecha de observación de modelado (202509) hay exactamente 12 meses de historia, por eso la ventana máxima es 12M.
 - **division_por_cero**: Los ratios con denominador 0 son nulos, nunca 0 ni infinito.
+- **precision**: Las variables DECIMAL se guardan redondeadas y en precisión simple (FLOAT): montos a 1 decimal (100 pesos), índices 0-100 a 2 decimales y el resto a 4 (ver decimales_por_unidad; una variable puede fijar `decimales`). Los decimales de más eran ruido de la deflación y ocupaban la mitad del archivo; los cálculos internos se hacen en precisión doble y sólo se redondea al guardar.
 
 ## Fuentes
 

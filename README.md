@@ -84,6 +84,8 @@ cendeu subir data/v2/variables variables
 
 Si una subida se corta por la red, `aws s3 sync <carpeta> s3://data-cendeu-raw/<prefijo> --profile fmargara` copia sólo lo que falta; después conviene volver a comparar los tamaños.
 
+Las variables decimales se guardan redondeadas según su unidad (montos a 1 decimal, índices 0-100 a 2, el resto a 4; `decimales_por_unidad` en el catálogo) y en precisión simple: cada fecha ocupa ~2,5 GB. Los cálculos se hacen en doble precisión y sólo se redondea al guardar.
+
 Tiempos de referencia (M-series, 10 núcleos, 16 GB, `--memoria 10GB`): base ~6 min; variables ~45 s por parte de ~1,3 M de CUITs (16 partes por fecha, ~12 min por fecha); informe de poder, unos minutos. Con menos de 10 GB fallan pasos que DuckDB no puede volcar a disco. `variables-v2 --retomar` saltea las partes ya escritas si una corrida se corta.
 
 **Modo muestra** (`variables-v2 --pct-muestra N`): para iterar sobre el catálogo sin recalcular toda la población. Toma los CUITs con `hash(CUIT) % 100 < N`, el mismo criterio de `poder` (10%) y `validar-v2` (3% en situación 1, 30% en situación 2), así que sus muestras quedan contenidas en la de las variables y los valores son idénticos a los de la población completa para esos CUITs. Con 30% alcanza para todos los informes. Cada fecha guarda la muestra en `_muestra.json`; no se mezclan porcentajes en una carpeta, `poder` y `validar-v2` fallan si se les pide más porcentaje del que hay, y `cendeu subir` rechaza las muestras (a S3 va sólo la población completa).
