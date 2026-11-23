@@ -142,3 +142,16 @@ def test_archivos_pagina(informe, tmp_path):
     assert "descripcion" in cab and "representante" in cab
     fuerte = next(f for f in filas[1:] if f[0] == "CEN_VAL_FUERTE_1M")
     assert fuerte[cab.index("descripcion")] == "d"
+
+
+def test_seleccion(informe, tmp_path):
+    _, out = informe
+    s = poder.seleccion(out, tmp_path / "seleccion.csv").set_index("variable")
+    assert (tmp_path / "seleccion.csv").exists()
+    rep = s.loc["CEN_VAL_FUERTE_1M", "grupo"]   # FUERTE y COPIA quedan juntas: sólo se recomienda la representante
+    otra = "CEN_VAL_COPIA_1M" if rep == "CEN_VAL_FUERTE_1M" else "CEN_VAL_FUERTE_1M"
+    assert s.loc[rep, "recomendada"]
+    assert not s.loc[otra, "recomendada"] and f"redundante con {rep}" in s.loc[otra, "motivo_no"]
+    assert not s.loc["CEN_VAL_DERIVA_1M", "recomendada"]
+    assert not s.loc["CEN_VAL_RUIDO_1M", "recomendada"] and "IV" in s.loc["CEN_VAL_RUIDO_1M", "motivo_no"]
+    assert (s.motivo_no.fillna("") == "").eq(s.recomendada).all()

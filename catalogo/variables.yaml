@@ -265,7 +265,10 @@ variables:
     tipo_dato: INTEGER
     unidad: meses
     nulos: nunca
-    sentido: "-"
+    sentido: "+"
+    observaciones: >
+      Sentido observado + (hipótesis original -, informe de poder v2). Quien siempre estuvo en
+      situación 1 tiene su peor momento en t (recencia 0), así que valores bajos marcan a los limpios.
 
   - nombre: CEN_FLG_PEOR_MOMENTO_1M
     sql: "(ult(s.SIT) = list_max(ven(s.SIT, 12)) AND ult(s.SIT) >= 2)::INT"
@@ -328,7 +331,10 @@ variables:
     tipo_dato: INTEGER
     unidad: meses
     nulos: nunca
-    sentido: "-"
+    sentido: "+"
+    observaciones: >
+      Sentido observado + (hipótesis original -, informe de poder v2). Para mejorar hay que haber
+      estado peor: el conteo funciona como marca de historia irregular.
 
   - nombre: CEN_RAT_CURA_12M
     requiere_mes_previo: true
@@ -348,8 +354,12 @@ variables:
     definicion: COUNT(SIT_{m-1} = 2 AND SIT_m >= 3) / COUNT(SIT_{m-1} = 2) en t-11..t
     unidad: proporción
     nulos: no estuvo en situación 2 en la ventana
-    sentido: "+"
-    observaciones: Roll de 2 a 3 del sistema = 34% mensual (estudio, sección 4).
+    sentido: "-"
+    observaciones: >
+      Roll de 2 a 3 del sistema = 34% mensual (estudio, sección 4). Sentido observado -
+      (hipótesis original +, informe de poder v2): la población exige SIT <= 2 en t, así que quien
+      ya pasó a 3 y volvió demostró cura, mientras que una tasa 0 incluye a los que están en
+      situación 2 por primera vez.
 
   - nombre: CEN_MAX_RACHA_SIT2P_12M
     sql: "max_racha(bits(ven(s.SIT, 12), 2))"
@@ -473,7 +483,10 @@ variables:
     definicion: "STD(DEUDA) / AVG(DEUDA) sobre t-{v1}..t"
     unidad: ratio
     nulos: promedio 0
-    sentido: "+"
+    sentido: "?"
+    observaciones: >
+      Hipótesis original +. En el informe de poder v2 el sentido observado es - a 6 meses y + a
+      12 meses, con IV < 0,1: relación no monótona.
 
   - nombre: CEN_PND_DEUDA_{v}M
     sql: "pnd(s.DEUDA, {v})"
@@ -551,7 +564,10 @@ variables:
     tipo_dato: INTEGER
     unidad: entidades
     nulos: nunca
-    sentido: "-"
+    sentido: "+"
+    observaciones: >
+      Sentido observado + en las tres ventanas (hipótesis original -, informe de poder v2): cerrar
+      relaciones acompaña a refinanciaciones, pases a pérdida o recortes de las entidades.
 
   - nombre: CEN_RCM_ULTIMA_ALTA_12M
     requiere_mes_previo: true
@@ -611,8 +627,10 @@ variables:
     tipo_dato: INTEGER
     unidad: meses
     nulos: nunca
-    sentido: "+"
-    observaciones: El 21% de los CUITs tiene huecos (estudio, hallazgo 4).
+    sentido: "-"
+    observaciones: >
+      El 21% de los CUITs tiene huecos (estudio, hallazgo 4). Sentido observado - (hipótesis
+      original +, informe de poder v2) con IV ≈ 0: el sentido es poco confiable.
 
   - nombre: CEN_RCM_PRIMERA_APARICION_12M
     sql: "12 - list_position(list_transform(ven(s.PRES, 12), lambda z: z = 1), true)"
@@ -633,7 +651,10 @@ variables:
     definicion: existe m en t-11..t con SIT_m >= 1 y SIT = 0 en m-3..m-1 y presencia antes de m-3
     tipo_dato: FLAG
     nulos: nunca
-    sentido: "+"
+    sentido: "-"
+    observaciones: >
+      Sentido observado - (hipótesis original +, informe de poder v2) con IV ≈ 0: el sentido es
+      poco confiable.
 
   # ------------------------------------------------------------------ B07 MIX POR TIPO DE ENTIDAD
   - nombre: CEN_PCT_DEUDA_{tipo}_1M
