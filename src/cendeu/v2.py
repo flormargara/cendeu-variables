@@ -60,6 +60,32 @@ TIPOS = ["BANCO", "CIA_FIN", "TARJETA_NB", "PNFC", "FIDEICOMISO"]
 TIPO_SQL = {"DECIMAL": "DOUBLE", "INTEGER": "INTEGER", "FLAG": "INTEGER", "CATEGORICA": "VARCHAR"}
 BANCARIOS = "('BANCO', 'CIA_FIN')"
 
+# ----------------------------------------------------------------------------- modo muestra
+ARCHIVO_MUESTRA = "_muestra.json"
+
+
+def filtro_muestra(pct: int | None, col: str = "cuit") -> str:
+    """Mismo criterio que poder, validación y scorecard: ``hash(CUIT) % 100 < pct`` (la muestra de un informe
+    con porcentaje menor o igual queda contenida en la de las variables)."""
+    return f" AND hash({col}) % 100 < {pct}" if pct is not None else ""
+
+
+def pct_muestra_de(dir_vars: str | Path) -> int:
+    """Porcentaje de CUITs con que se armaron las variables de ``dir_vars`` (100 = población completa).
+
+    Las carpetas escritas antes del modo muestra no tienen ``_muestra.json`` y son población completa.
+    """
+    pcts = [json.loads(f.read_text())["pct_muestra"] for f in Path(dir_vars).glob(f"periodo_obs=*/{ARCHIVO_MUESTRA}")]
+    return min(pcts, default=100)
+
+
+def verificar_muestra(dir_vars: str | Path, pct: int) -> None:
+    """Falla si se pide un porcentaje mayor que el de la muestra con que se armaron las variables."""
+    disponible = pct_muestra_de(dir_vars)
+    if pct > disponible:
+        raise ValueError(f"{dir_vars}: las variables son una muestra del {disponible}% de los CUITs y se pidió el {pct}%. "
+                         f"Regenerarlas con `cendeu variables-v2 --pct-muestra {pct}` (o mayor) o bajar el porcentaje.")
+
 
 def _hash(path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
@@ -316,17 +342,32 @@ def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool, prim
 
 def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalogo: str | Path,
                         desempeno: int = 6, n_buckets: int = N_BUCKETS, buckets: list[int] | None = None,
-                        retomar: bool = False, **kw) -> Path:
+                        retomar: bool = False, pct_muestra: int | None = None, **kw) -> Path:
     """Variables v2 a la fecha ``obs`` para todos los CUITs presentes en ``obs``.
 
-    Escribe ``dst/periodo_obs=AAAAMM/parte_BB.parquet``. Columnas: CUIT, PERIODO_OBS, EN_POBLACION,
-    target (nulo si el desempeño no está completo) y las variables del catálogo.
+    Escribe ``dst/periodo_obs=AAAAMM/parte_BB.parquet`` y ``_muestra.json``. Columnas: CUIT, PERIODO_OBS,
+    EN_POBLACION, target (nulo si el desempeño no está completo) y las variables del catálogo.
+
+    ``pct_muestra``: sólo los CUITs con ``hash(CUIT) % 100 < pct_muestra`` (modo desarrollo). La muestra queda
+    registrada en ``_muestra.json``; no se pueden mezclar en una carpeta partes con distinto porcentaje, y
+    ``cendeu subir`` rechaza las muestras (en S3 va sólo la población completa).
     """
+    if pct_muestra is not None and not 1 <= pct_muestra <= 100:
+        raise ValueError(f"pct_muestra debe estar entre 1 y 100: {pct_muestra}")
+    pct = None if pct_muestra in (None, 100) else pct_muestra
+    fm = filtro_muestra(pct)
     cat = cat_mod.cargar(catalogo)
     if cat.errores:
         raise ValueError("Catálogo con errores:\n" + "\n".join(cat.errores))
     base, out = Path(dir_base), Path(dst) / f"periodo_obs={obs}"
     out.mkdir(parents=True, exist_ok=True)
+    meta_muestra = out / ARCHIVO_MUESTRA
+    previo = json.loads(meta_muestra.read_text())["pct_muestra"] if meta_muestra.exists() else (
+        100 if any(out.glob("parte_*.parquet")) else None)
+    if previo is not None and previo != (pct or 100):
+        raise ValueError(f"{out} ya tiene partes con muestra del {previo}%; usar otra carpeta para el {pct or 100}%")
+    meta_muestra.write_text(json.dumps({"pct_muestra": pct or 100,
+                                        "criterio": f"hash(CUIT) % 100 < {pct}" if pct else "población completa"}))
     p_ini, p_fin = periodo_mas(obs, -(LARGO - 1)), periodo_mas(obs, desempeno)
     fin_mes = f"last_day(DATE '{obs // 100}-{obs % 100:02d}-01')"
     with conexion(**kw) as con:
@@ -349,16 +390,16 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                 CREATE OR REPLACE TEMP TABLE b AS
                 SELECT cuit, entidad, situacion, monto, pj, reemplazado, tipo, recupero,
                        ((periodo // 100) * 12 + periodo % 100) - {mi(obs)} + 13 AS i
-                FROM base WHERE bucket = {k} AND periodo BETWEEN {p_ini} AND {obs};
+                FROM base WHERE bucket = {k} AND periodo BETWEEN {p_ini} AND {obs}{fm};
             """)
             con.execute(_series_sql(obs))
             con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE hist AS   -- último mes en situación 2+ en toda la historia hasta t
                 SELECT cuit, max(periodo) AS ult_sit2p FROM base
-                WHERE bucket = {k} AND periodo <= {obs} AND situacion >= 2 GROUP BY cuit;
+                WHERE bucket = {k} AND periodo <= {obs} AND situacion >= 2{fm} GROUP BY cuit;
                 CREATE OR REPLACE TEMP TABLE tgt AS
                 SELECT cuit, max(situacion) AS sit_max_desemp FROM base
-                WHERE bucket = {k} AND periodo > {obs} AND periodo <= {p_fin} GROUP BY cuit;
+                WHERE bucket = {k} AND periodo > {obs} AND periodo <= {p_fin}{fm} GROUP BY cuit;
                 CREATE OR REPLACE TEMP TABLE per AS
                 SELECT cuit,
                   CASE WHEN tipo_persona(cuit) = 'HUMANA' AND date_diff('year', fecha_nac, {fin_mes}) BETWEEN 0 AND 110 THEN date_diff('year', fecha_nac, {fin_mes}) END AS EDAD,
@@ -368,10 +409,10 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                   lpad(provincia::VARCHAR, 2, '0') AS PROVINCIA,
                   coalesce((fecha_fallecimiento <= {fin_mes})::INT, 0) AS FALLECIDO,
                   coalesce(sexo, 'SIN_REGISTRAR') AS SEXO, desde_sit1
-                FROM read_parquet('{_q(base / 'persona')}/*/*.parquet', hive_partitioning = true) WHERE bucket = {k};
+                FROM read_parquet('{_q(base / 'persona')}/*/*.parquet', hive_partitioning = true) WHERE bucket = {k}{fm};
             """)
             if hay_mensual:
-                con.execute(f"CREATE OR REPLACE TEMP TABLE mm AS SELECT * FROM read_parquet('{_q(mensual_dir)}/*/*.parquet', hive_partitioning = true) WHERE bucket = {k}")
+                con.execute(f"CREATE OR REPLACE TEMP TABLE mm AS SELECT * FROM read_parquet('{_q(mensual_dir)}/*/*.parquet', hive_partitioning = true) WHERE bucket = {k}{fm}")
             else:
                 con.execute("CREATE OR REPLACE TEMP TABLE mm AS SELECT NULL::BIGINT cuit WHERE false")
             # Meses en situación 1 ininterrumpida (1DSF + 24DSF); se agrega a x antes de evaluar el catálogo

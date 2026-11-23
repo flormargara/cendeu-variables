@@ -6,6 +6,7 @@ archivo (los cortes nuevos rectifican meses anteriores). Nunca borra objetos.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -27,6 +28,10 @@ def subir(dir_local: str | Path, prefijo: str, perfil: str = "fmargara", bucket:
     ``simular``: sólo lista lo que subiría.
     """
     base, filas = Path(dir_local), []
+    muestras = [f.parent.name for f in base.rglob("_muestra.json") if json.loads(f.read_text())["pct_muestra"] < 100]
+    if muestras:
+        raise ValueError(f"{base} tiene variables armadas sobre una muestra ({', '.join(sorted(muestras))}): "
+                         "a S3 va sólo la población completa")
     for f in sorted(p for p in base.rglob("*") if p.is_file() and not p.name.startswith(".")):
         rel = f.relative_to(base)
         nombre = (renombrar or {}).get(rel.name, rel.name)

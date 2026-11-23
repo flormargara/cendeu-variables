@@ -30,6 +30,7 @@ from sklearn.metrics import roc_auc_score
 
 from . import catalogo as cat_mod
 from .scorecard import Binning, _ks, binning_monotono
+from .v2 import verificar_muestra
 
 SEGMENTOS = {
     "sit1": {"filtro": "CEN_MAX_SIT_1M = 1", "pct_muestra": 3},
@@ -47,6 +48,7 @@ def candidatas(catalogo: str | Path) -> list[str]:
 
 def cargar_muestra(dir_vars: str | Path, variables: list[str], target: str, filtro: str, pct: int,
                    fechas: list[int], memory_limit: str = "6GB") -> pd.DataFrame:
+    verificar_muestra(dir_vars, pct)
     con = duckdb.connect()
     con.execute(f"SET memory_limit = '{memory_limit}'; SET preserve_insertion_order = false;")
     sel = ", ".join(f'"{v}"::FLOAT AS "{v}"' for v in variables)
@@ -182,6 +184,7 @@ def comparar_v1(dir_vars: str | Path, vars_v1: str | Path, modelo_v1: str | Path
     ``obs`` si está fuera de sus fechas de desarrollo; la v1 se entrenó en 202509 con target a 12 meses."""
     from .scoring import cargar_modelo, sql_score
 
+    verificar_muestra(dir_vars, pct)
     con = duckdb.connect()
     con.execute("SET memory_limit = '6GB';")
     con.execute(f"""CREATE TEMP TABLE v2 AS SELECT * FROM read_parquet('{Path(dir_vars)}/periodo_obs={obs}/parte_*.parquet')
