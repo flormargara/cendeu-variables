@@ -116,15 +116,35 @@ COLUMNAS_DICCIONARIO = [
     "AGRUPADOR", "UNIDAD TIEMPO", "ACTUALIZACION", "TIPO DATO", "CLASE", "NULOS", "LINK", "OBSERVACIONES",
     # agregadas respecto de la plantilla CRC
     "BLOQUE", "USO", "SENTIDO ESPERADO", "UNIDAD", "DISPONIBLE DESDE", "SQL",
+    # del informe de poder (`cendeu seleccion`)
+    "IV", "GRUPO", "RECOMENDADA",
 ]
 _TIPO = {"INTEGER": "int", "FLAG": "int", "DECIMAL": "float", "CATEGORICA": "string"}
 _CLASE = {"INTEGER": "numeric", "DECIMAL": "numeric", "FLAG": "binary", "CATEGORICA": "category"}
 
 
-def filas_diccionario(cat: Catalogo, link_doc: str = "docs/variables.md") -> list[dict]:
+def cargar_seleccion(ruta: str | Path | None) -> dict[str, dict]:
+    """Lee ``catalogo/seleccion.csv`` (salida de ``cendeu seleccion``); vacío si no existe."""
+    import csv
+    if not ruta or not Path(ruta).exists():
+        return {}
+    with Path(ruta).open(encoding="utf-8") as f:
+        return {r["variable"]: r for r in csv.DictReader(f)}
+
+
+def _rec(s: dict | None) -> str:
+    if not s:
+        return ""
+    return "SI" if s["recomendada"] == "True" else "NO"
+
+
+def filas_diccionario(cat: Catalogo, seleccion: dict[str, dict] | None = None,
+                      link_doc: str = "docs/variables.md") -> list[dict]:
     doc, fuentes, bloques = cat.meta.get("documentacion", {}), cat.meta["fuentes"], cat.meta["bloques"]
+    seleccion = seleccion or {}
     filas = []
     for v in cat.variables:
+        s = seleccion.get(v["nombre"])
         origen = " + ".join(f"{f.strip()} ({fuentes[f.strip()]})" for f in str(v["fuente"]).split("+"))
         filas.append({
             "VARIABLE": v["nombre"],
@@ -137,11 +157,12 @@ def filas_diccionario(cat: Catalogo, link_doc: str = "docs/variables.md") -> lis
             "OBSERVACIONES": " ".join(str(v.get("observaciones", "")).split()),
             "BLOQUE": v["bloque"], "USO": v["uso"], "SENTIDO ESPERADO": v.get("sentido", ""),
             "UNIDAD": v.get("unidad", ""), "DISPONIBLE DESDE": v.get("disponible_desde", ""), "SQL": v["sql"],
+            "IV": s["iv"] if s else "", "GRUPO": s["grupo"] if s else "", "RECOMENDADA": _rec(s),
         })
     return filas
 
 
-def escribir_diccionario(cat: Catalogo, dst: str | Path) -> Path:
+def escribir_diccionario(cat: Catalogo, dst: str | Path, seleccion: dict[str, dict] | None = None) -> Path:
     """CSV en UTF-8 con BOM (abre bien en Excel)."""
     import csv
     dst = Path(dst)
@@ -149,7 +170,7 @@ def escribir_diccionario(cat: Catalogo, dst: str | Path) -> Path:
     with dst.open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNAS_DICCIONARIO)
         w.writeheader()
-        w.writerows(filas_diccionario(cat))
+        w.writerows(filas_diccionario(cat, seleccion))
     return dst
 
 
@@ -188,8 +209,8 @@ observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deud
 """
 
 
-def escribir_documento(cat: Catalogo, dst: str | Path) -> Path:
-    m, out = cat.meta, [_INTRO]
+def escribir_documento(cat: Catalogo, dst: str | Path, seleccion: dict[str, dict] | None = None) -> Path:
+    m, out, seleccion = cat.meta, [_INTRO], seleccion or {}
     for t in m["targets"]:
         out += [f"- **`{t['nombre']}`**: {t['descripcion']}. Definición: `{t['definicion']}`.",
                 f"- **Población**: {' '.join(t['poblacion'].split())}",
@@ -210,13 +231,26 @@ def escribir_documento(cat: Catalogo, dst: str | Path) -> Path:
         out.append(f"| [{b}](#{b.lower()}) | {d} | {sum(usos.get(b, {}).values())} | {u} |")
     out += ["", "`uso`: **modelo** = candidata al score; **futuro** = sólo existe desde 202609 (mensual), entra cuando haya "
             "historia acumulada; **monitoreo** = no entra al score, sirve para medir sesgos; **exclusion** = define la población.",
-            "", "Sentido esperado: relación hipotética con el riesgo (`+` = más valor, más riesgo). Se contrasta en el informe de poder."]
+            "", "Sentido esperado: relación con el riesgo (`+` = más valor, más riesgo). Se planteó como hipótesis y se "
+            "corrigió con el informe de poder v2 donde salió al revés (la hipótesis original queda en las notas)."]
+    if seleccion:
+        recs = [v for v in cat.variables if _rec(seleccion.get(v["nombre"])) == "SI"]
+        out += ["", "## Variables recomendadas", "",
+                f"{len(recs)} variables marcadas como punto de partida para un modelo (columna **Rec.**): uso `modelo`, "
+                "IV ≥ 0,1, PSI máximo < 0,1 y representante de su grupo de correlación (|Spearman| ≥ 0,8, la de mayor IV "
+                "representa al grupo). Es una recomendación, no un recorte: todas las variables del catálogo se siguen "
+                "calculando, y la elección final depende del modelo que las use (segmento, objetivo). Detalle y motivo de "
+                "las no recomendadas en [`catalogo/seleccion.csv`](../catalogo/seleccion.csv); métricas en el "
+                "[informe de poder](../reportes/poder_v2/)."]
     for b, d in m["bloques"].items():
         out += ["", f'<a id="{b.lower()}"></a>', f"## {b} — {d}", "",
-                "| Variable | Descripción | Definición | Nulos | Sentido | Uso |", "|---|---|---|---|---|---|"]
+                "| Variable | Descripción | Definición | Nulos | Sentido | Uso | IV | Rec. |", "|---|---|---|---|---|---|---|---|"]
         for v in (x for x in cat.variables if x["bloque"] == b):
             defi = " ".join(str(v["definicion"]).split()).replace("|", "\\|")
-            out.append(f"| `{v['nombre']}` | {v['descripcion']} | {defi} | {v['nulos']} | {v.get('sentido', '')} | {v['uso']} |")
+            s = seleccion.get(v["nombre"])
+            iv = f"{float(s['iv']):.2f}".replace(".", ",") if s else ""
+            out.append(f"| `{v['nombre']}` | {v['descripcion']} | {defi} | {v['nulos']} | {v.get('sentido', '')} | {v['uso']} "
+                       f"| {iv} | {_rec(s)} |")
         obs = [(v["nombre"], " ".join(str(v["observaciones"]).split())) for v in cat.variables
                if v["bloque"] == b and v.get("observaciones")]
         if obs:

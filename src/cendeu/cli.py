@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("documentar", help="v2: genera docs/variables.md y docs/diccionario_variables.csv desde el catálogo")
     p.add_argument("--catalogo", default="catalogo/variables.yaml"); p.add_argument("--docs", default="docs")
+    p.add_argument("--seleccion", default="catalogo/seleccion.csv", help="salida de `cendeu seleccion` (si existe)")
 
     p = sub.add_parser("poder", help="v2: informe de poder (IV, Gini, KS, PSI, correlaciones, incremental vs v1)")
     p.add_argument("dir_variables"); p.add_argument("--salida", default="reportes/poder_v2")
@@ -62,6 +63,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--pct-muestra", type=int, default=10)
     p.add_argument("--vars-v1", help="Parquet de variables v1 para el valor incremental")
     p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json"); p.add_argument("--obs-v1", type=int, default=202509)
+
+    p = sub.add_parser("seleccion", help="v2: marca las variables recomendadas (IV, PSI, grupo) en catalogo/seleccion.csv")
+    p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--salida", default="catalogo/seleccion.csv")
 
     p = sub.add_parser("pagina-poder", help="v2: arma los CSV de la página del informe de poder")
     p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--catalogo", default="catalogo/variables.yaml")
@@ -105,13 +109,18 @@ def main(argv: list[str] | None = None) -> None:
         c = catalogo.cargar(a.catalogo)
         if c.errores:
             raise SystemExit("\n".join(c.errores))
-        print(catalogo.escribir_diccionario(c, Path(a.docs) / "diccionario_variables.csv"))
-        print(catalogo.escribir_documento(c, Path(a.docs) / "variables.md"))
+        sel = catalogo.cargar_seleccion(a.seleccion)
+        print(catalogo.escribir_diccionario(c, Path(a.docs) / "diccionario_variables.csv", sel))
+        print(catalogo.escribir_documento(c, Path(a.docs) / "variables.md", sel))
     elif a.cmd == "poder":
         from . import poder
         r = poder.informe(a.dir_variables, a.catalogo, a.salida, fechas_oot=a.oot, pct_muestra=a.pct_muestra,
                           vars_v1=a.vars_v1, modelo_v1=a.modelo_v1 if a.vars_v1 else None, obs_v1=a.obs_v1, memory_limit=a.memoria)
         print(r.head(25).to_string(index=False))
+    elif a.cmd == "seleccion":
+        from . import poder
+        s = poder.seleccion(a.reporte, a.salida)
+        print(f"{int(s.recomendada.sum())} recomendadas de {len(s)} evaluadas -> {a.salida}")
     elif a.cmd == "pagina-poder":
         from . import poder
         for r in poder.archivos_pagina(a.reporte, a.catalogo, a.salida):

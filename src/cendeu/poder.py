@@ -294,3 +294,39 @@ def archivos_pagina(dir_reporte: str | Path, catalogo: str | Path, dst: str | Pa
         df.to_csv(dst / nombre, index=False, float_format=fmt)
         rutas.append(dst / nombre)
     return rutas
+
+
+# ----------------------------------------------------------------------------- selección recomendada
+IV_MIN, PSI_MAX = 0.1, 0.1
+
+
+def seleccion(dir_reporte: str | Path, dst: str | Path, iv_min: float = IV_MIN, psi_max: float = PSI_MAX) -> pd.DataFrame:
+    """Marca las variables recomendadas como punto de partida para un modelo y escribe ``catalogo/seleccion.csv``.
+
+    No recorta nada: todas las variables del catálogo se siguen calculando. Recomendada = uso ``modelo``,
+    IV >= ``iv_min``, PSI máximo < ``psi_max`` y representante de su grupo de correlación (las categóricas no
+    se agrupan y cuentan como su propio grupo). La elección final depende de cada modelo (segmento, objetivo).
+    """
+    r = pd.read_csv(Path(dir_reporte) / "resumen.csv")
+    r["grupo"] = r.grupo.fillna(r.variable)
+    r["representante"] = r.grupo == r.variable
+    motivos = []
+    for x in r.itertuples():
+        m = []
+        if x.uso != "modelo":
+            m.append(f"uso {x.uso}")
+        if not x.iv >= iv_min:
+            m.append(f"IV < {iv_min:g}")
+        if not x.psi_max < psi_max:
+            m.append(f"PSI >= {psi_max:g}")
+        if not x.representante:
+            m.append(f"redundante con {x.grupo}")
+        motivos.append("; ".join(m))
+    r["motivo_no"] = motivos
+    r["recomendada"] = r.motivo_no == ""
+    cols = ["variable", "recomendada", "iv", "gini_oot", "psi_max", "grupo", "representante", "motivo_no"]
+    out = r[cols].sort_values(["recomendada", "iv"], ascending=[False, False])
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(dst, index=False, float_format="%.4f")
+    return out

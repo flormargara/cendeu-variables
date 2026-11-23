@@ -169,3 +169,23 @@ def test_documentacion_v2(tmp_path):
     assert list(filas[0]) == COLUMNAS_DICCIONARIO and len(filas) == len(cat.variables)
     doc = escribir_documento(cat, tmp_path / "v.md").read_text(encoding="utf-8")
     assert all(f"`{v['nombre']}`" in doc for v in cat.variables)
+
+
+def test_documentacion_con_seleccion(tmp_path):
+    import csv
+    from pathlib import Path
+
+    from cendeu.catalogo import cargar, cargar_seleccion, escribir_diccionario, escribir_documento
+
+    cat = cargar(Path(__file__).parents[1] / "catalogo" / "variables.yaml")
+    a, b = cat.variables[0]["nombre"], cat.variables[1]["nombre"]
+    (tmp_path / "s.csv").write_text("variable,recomendada,iv,gini_oot,psi_max,grupo,representante,motivo_no\n"
+                                    f"{a},True,0.5,0.3,0.01,{a},True,\n{b},False,0.4,0.2,0.01,{a},False,redundante con {a}\n")
+    sel = cargar_seleccion(tmp_path / "s.csv")
+    assert cargar_seleccion(tmp_path / "no_existe.csv") == {}
+    with escribir_diccionario(cat, tmp_path / "d.csv", sel).open(encoding="utf-8-sig") as f:
+        filas = {r["VARIABLE"]: r for r in csv.DictReader(f)}
+    assert filas[a]["RECOMENDADA"] == "SI" and filas[b]["RECOMENDADA"] == "NO" and filas[b]["GRUPO"] == a
+    assert filas[cat.variables[2]["nombre"]]["RECOMENDADA"] == ""
+    doc = escribir_documento(cat, tmp_path / "v.md", sel).read_text(encoding="utf-8")
+    assert "## Variables recomendadas" in doc and "1 variables marcadas" in doc
