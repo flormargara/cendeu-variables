@@ -97,8 +97,12 @@ def convertir(txt_24dsf: str | Path, dst_dir: str | Path, corte: int, **kw) -> P
     return Path(dst_dir)
 
 
-def validar_contra_control(parquet_dir: str | Path, control_txt: str | Path, **kw) -> dict:
-    """Compara cantidad y monto por entidad×período contra ``24DSF_control.txt``."""
+def validar_contra_control(parquet_dir: str | Path, control_txt: str | Path, desde: int | None = None, **kw) -> dict:
+    """Compara cantidad y monto por entidad×período contra ``24DSF_control.txt``.
+
+    ``desde``: primer período del 24DSF. El control del corte 202609 trae 25 meses (incluye 202409, que el
+    24DSF no tiene); esos pares se cuentan aparte en ``pares_fuera_ventana``.
+    """
     with conexion(**kw) as con:
         con.execute(f"""
             CREATE TEMP TABLE ctrl AS
@@ -106,6 +110,8 @@ def validar_contra_control(parquet_dir: str | Path, control_txt: str | Path, **k
                    replace(split_part(trim(substr(l,12)),' ',1),',','.')::DECIMAL(18,1) monto_c,
                    regexp_extract(trim(substr(l,12)),'(\\d+)\\s*$',1)::BIGINT n_c
             FROM read_csv('{control_txt}', columns={{'l':'VARCHAR'}}, delim='|', quote='', header=false, auto_detect=false);
+            CREATE TEMP TABLE fuera AS SELECT * FROM ctrl WHERE periodo < {desde or 0};
+            DELETE FROM ctrl WHERE periodo < {desde or 0};
             CREATE TEMP TABLE pq AS
             SELECT entidad, periodo, sum(monto) monto_p, count(*) n_p
             FROM read_parquet('{Path(parquet_dir)}/**/*.parquet', hive_partitioning=true) GROUP BY ALL;
@@ -115,10 +121,12 @@ def validar_contra_control(parquet_dir: str | Path, control_txt: str | Path, **k
                    count(p.entidad) pares_con_datos,
                    count(*) FILTER (n_c = n_p AND monto_c = monto_p) exactos,
                    count(*) FILTER (n_c = 2*n_p AND monto_c = 2*monto_p) control_doble,
-                   (SELECT count(*) FROM pq LEFT JOIN ctrl c USING (entidad, periodo) WHERE c.entidad IS NULL) pares_sin_control
+                   (SELECT count(*) FROM pq LEFT JOIN ctrl c USING (entidad, periodo) WHERE c.entidad IS NULL) pares_sin_control,
+                   (SELECT count(*) FROM fuera) pares_fuera_ventana
             FROM ctrl c LEFT JOIN pq p USING (entidad, periodo)
         """).fetchone()
-    return dict(zip(["pares_control", "pares_con_datos", "exactos", "control_doble", "pares_sin_control"], r))
+    return dict(zip(["pares_control", "pares_con_datos", "exactos", "control_doble", "pares_sin_control",
+                     "pares_fuera_ventana"], r))
 
 
 # -------------------------------------------------------------------- variables

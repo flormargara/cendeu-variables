@@ -50,6 +50,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | [`docs/variables_mix.md`](docs/variables_mix.md) | hecho (diseño; implementar cuando haya datos propios) |
 | 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | [`reportes/poder_v2/`](reportes/poder_v2/) (`cendeu poder`) y su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/), publicada como artifact en claude.ai | hecho: 99 de 139 variables con IV ≥ 0,1, 60 grupos no redundantes, PSI máximo 0,034; repetido por segmento (sit1 y sit2) con selección recomendada en `catalogo/seleccion.csv` |
 | 6 | Validación multivariada de las variables (ajuste por segmento sólo como prueba, no como modelo) | [`reportes/validacion_v2/`](reportes/validacion_v2/) (`cendeu validar-v2`) | hecho |
+| 7 | Actualización mensual automatizada | `cendeu actualizar` ([`src/cendeu/actualizar.py`](src/cendeu/actualizar.py)), resumen por corte en [`reportes/actualizaciones/`](reportes/actualizaciones/) | etapa 1 hecha (comando con controles, probado con el corte 202609); falta la detección programada y, opcional, correrlo en AWS |
 
 ## Resultados de la Fase 5
 
@@ -64,6 +65,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 ## Lecciones de la implementación
 
+- **Archivo de control del 24DSF**: trae 25 meses (el del corte 202609 incluye 202409) y en 214 pares entidad × mes duplica cantidad y monto. El control compara sólo los 24 meses del archivo y acepta el duplicado.
+
 - **Fotos del corte**: el 1DSF y el padrón son fotos de hoy. El 1DSF filtraba el desempeño (IV 7,5 falso), por eso las variables tienen `disponible_desde` y quedan nulas en fechas anteriores a su fuente. Actividad y provincia del padrón no mostraron señales de fuga (PSI ≈ 0), pero siguen siendo fotos.
 - **Borde de la historia**: las variables que necesitan el mes previo a su ventana (`requiere_mes_previo`) quedan nulas cuando ese mes no está en el 24DSF (202509 para ventanas de 12 meses).
 - **Memoria**: la base se escribe bucket por bucket y las variables por partes de ~1,3 M de CUITs con 10 GB; con menos memoria fallan pasos que DuckDB no vuelca a disco. Para iterar en desarrollo está el modo muestra (`variables-v2 --pct-muestra 30`, ver README) y la población completa queda para la corrida que se sube a S3.
@@ -72,6 +75,9 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 ## Pendientes
 
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
+- Actualización mensual, etapa 2: tarea programada que corre `cendeu actualizar --detectar` (el paquete de 202609 tiene fecha de proceso 2026-11-05, así que 202610 debería llegar a principios de diciembre) y, si el corte está completo, la actualización completa con aviso.
+- Actualización mensual, etapa 3 (opcional): correrla en AWS con el rol `data-cendeu`, disparada al llegar los paquetes a `s3://data-cendeu-raw/entrada/AAAAMM/`.
+- Decidir si cada corte recalcula las fechas anteriores (`--recalcular`, ~1,5 h más) o sólo agrega las nuevas (default).
 
 ## Bloques de variables (Fase 2)
 

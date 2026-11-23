@@ -104,11 +104,14 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
                    mensual: str | Path | None = None, padron: str | Path | None = None,
                    uno_dsf: str | Path | None = None, base_ipc: int | None = None,
                    n_buckets: int = N_BUCKETS, hilos: int = 6, desde: int | None = None,
-                   solo: list[int] | None = None, extras: bool = True, **kw) -> Path:
+                   solo: list[int] | None = None, extras: bool = True,
+                   reemplazo_mensual: list[int] | None = None, **kw) -> Path:
     """Escribe ``dst/deudores/periodo=P/bucket=B``, ``dst/persona/bucket=B`` y ``dst/mensual/periodo=P/bucket=B``.
 
     ``mensual``: directorio con ``periodo=P/data.parquet`` del deudores.txt convertido; esos períodos
-    reemplazan al 24DSF (el 24DSF omite entidades en su primer mes).
+    reemplazan al 24DSF (el 24DSF omite entidades en su primer mes). ``reemplazo_mensual``: limita el reemplazo
+    a esos períodos (con un corte nuevo, sólo el mes de corte: los meses anteriores del 24DSF ya vienen
+    completos y rectificados); el resumen de campos del mensual se arma igual para todos los meses que haya.
     Cada período se escribe bucket por bucket: un COPY particionado de un mes completo (~40 M filas)
     no entra en 10 GB.
     """
@@ -146,12 +149,13 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
         base = base_ipc or con.execute("SELECT max(periodo) FROM ipc").fetchone()[0]
         ipc_base = con.execute("SELECT ipc FROM ipc WHERE periodo = ?", [base]).fetchone()[0]
         periodos = sorted({r[0] for r in con.execute("SELECT DISTINCT periodo FROM d24").fetchall()} | set(periodos_men))
+    reemplazan = [q for q in periodos_men if reemplazo_mensual is None or q in reemplazo_mensual]
     for p in periodos:
         if (desde and p < desde) or (solo and p not in solo):  # retomar una corrida cortada
             continue
         t0 = time.time()
         with con_base() as con:
-            if p in periodos_men:
+            if p in reemplazan:
                 fuente = f"""SELECT entidad, cuit, periodo, CASE WHEN situacion = 11 THEN 1 ELSE situacion END AS situacion,
                                     (coalesce(prestamos, 0) + coalesce(garantias_otorgadas, 0) + coalesce(otros_conceptos, 0))::DOUBLE AS monto,
                                     (proceso_judicial IN (1, 2))::INT AS pj
@@ -187,7 +191,7 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
             f"SELECT periodo FROM read_csv('{_q(ipc_csv)}', header = true) WHERE imputado = 1 AND periodo <= {max(periodos)}").fetchall()]
     _escribir_meta(dst, dict(
         fecha=dt.datetime.now().isoformat(timespec="seconds"), periodos=[min(periodos), max(periodos)],
-        periodos_mensual=periodos_men, base_ipc=base, ipc_base=ipc_base, ipc_imputados=imputados,
+        periodos_mensual=periodos_men, reemplazo_mensual=reemplazan, base_ipc=base, ipc_base=ipc_base, ipc_imputados=imputados,
         archivos={"ipc": _hash(ipc_csv), "entidades": _hash(ref / "entidades.csv"),
                   "equivalencias": _hash(ref / "entidades_equivalencias.csv")},
         padron=str(padron) if padron else None, uno_dsf=str(uno_dsf) if uno_dsf else None, n_buckets=n_buckets))

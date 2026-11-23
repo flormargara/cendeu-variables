@@ -5,7 +5,8 @@ Cada archivo se valida por largo de registro antes de convertir: si alguna líne
 que dice el LEAME, se aborta (el BCRA cambió el diseño).
 
 Uso:
-    python estudios/convertir_paquete_mensual.py <dir_downloads> <dir_salida> --periodo 202609 --padron 20261030
+    python -m cendeu.paquete <dir_downloads> <dir_salida> --periodo 202609 --padron 20261030
+    (``cendeu actualizar`` lo llama con ``trabajos``/``convertir_todo``).
 """
 import argparse
 import pathlib
@@ -88,6 +89,37 @@ def convertir(c, src: pathlib.Path, campos, dst: pathlib.Path, tmp: pathlib.Path
     return malos[1]
 
 
+def trabajos(d: pathlib.Path, o: pathlib.Path, p: int, padron: int) -> dict:
+    """{nombre: (archivo de origen, diseño, destino)} del paquete mensual ``p`` y el padrón ``padron``."""
+    return {
+        "maeent": (d / f"{p}DEUDORES/Maeent.txt", MAEENT, o / f"entidades/periodo={p}/maeent.parquet"),
+        "1dsf": (d / f"1DSF{p}/1DSF.txt", UNO_DSF, o / f"desde_sit1/periodo={p}/data.parquet"),
+        "inf_ret": (d / f"{p}INFRET/inf_ret.txt", RECTIFICATIVAS, o / f"rectificativas/publicado={p}/inf_ret.parquet"),
+        "inf_retparc": (d / f"{p}INFRETPA/inf_retparc.txt", RECTIFICATIVAS, o / f"rectificativas/publicado={p}/inf_retparc.parquet"),
+        "actividades": (d / f"{padron}PADRON/Actividades_ARCA.txt", ACTIVIDADES, o / f"padron/corte={padron}/actividades.parquet"),
+        "deudores": (d / f"{p}DEUDORES/deudores.txt", DEUDORES, o / f"deudores_mensual/periodo={p}/data.parquet"),
+        "padron": (d / f"{padron}PADRON/Padron_ARCA.txt", PADRON, o / f"padron/corte={padron}/padron.parquet"),
+    }
+
+
+def convertir_todo(d: pathlib.Path, o: pathlib.Path, p: int, padron: int, memoria: str = "8GB",
+                   tmp: pathlib.Path | None = None, solo: list[str] | None = None) -> dict[str, int]:
+    """Convierte el paquete mensual y el padrón; devuelve las filas de cada archivo."""
+    tmp = tmp or o / "_tmp_conv"
+    tmp.mkdir(parents=True, exist_ok=True)
+    c = duckdb.connect()
+    c.execute(f"SET memory_limit = '{memoria}'; SET preserve_insertion_order = false;")
+    filas = {}
+    for nombre, (src, campos, dst) in trabajos(d, o, p, padron).items():
+        if solo and nombre not in solo:
+            continue
+        t = time.time()
+        filas[nombre] = convertir(c, src, campos, dst, tmp)
+        print(f"{nombre}: {filas[nombre]:,} filas, {time.time() - t:.0f}s -> {dst}", flush=True)
+    c.close()
+    return filas
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("downloads"); ap.add_argument("salida")
@@ -95,25 +127,8 @@ def main():
     ap.add_argument("--memoria", default="8GB"); ap.add_argument("--solo", nargs="*")
     ap.add_argument("--tmp", default="/tmp/cendeu_conv", help="dir para copias recodificadas")
     a = ap.parse_args()
-    d, o, p = pathlib.Path(a.downloads), pathlib.Path(a.salida), a.periodo
-    trabajos = {
-        "maeent": (d / f"{p}DEUDORES/Maeent.txt", MAEENT, o / f"entidades/periodo={p}/maeent.parquet"),
-        "1dsf": (d / f"1DSF{p}/1DSF.txt", UNO_DSF, o / f"desde_sit1/periodo={p}/data.parquet"),
-        "inf_ret": (d / f"{p}INFRET/inf_ret.txt", RECTIFICATIVAS, o / f"rectificativas/publicado={p}/inf_ret.parquet"),
-        "inf_retparc": (d / f"{p}INFRETPA/inf_retparc.txt", RECTIFICATIVAS, o / f"rectificativas/publicado={p}/inf_retparc.parquet"),
-        "actividades": (d / f"{a.padron}PADRON/Actividades_ARCA.txt", ACTIVIDADES, o / f"padron/corte={a.padron}/actividades.parquet"),
-        "deudores": (d / f"{p}DEUDORES/deudores.txt", DEUDORES, o / f"deudores_mensual/periodo={p}/data.parquet"),
-        "padron": (d / f"{a.padron}PADRON/Padron_ARCA.txt", PADRON, o / f"padron/corte={a.padron}/padron.parquet"),
-    }
-    tmp = pathlib.Path(a.tmp); tmp.mkdir(parents=True, exist_ok=True)
-    c = duckdb.connect()
-    c.execute(f"SET memory_limit = '{a.memoria}'; SET preserve_insertion_order = false;")
-    for nombre, (src, campos, dst) in trabajos.items():
-        if a.solo and nombre not in a.solo:
-            continue
-        t = time.time()
-        n = convertir(c, src, campos, dst, tmp)
-        print(f"{nombre}: {n:,} filas, {time.time() - t:.0f}s -> {dst}", flush=True)
+    convertir_todo(pathlib.Path(a.downloads), pathlib.Path(a.salida), a.periodo, a.padron, a.memoria,
+                   pathlib.Path(a.tmp), a.solo)
 
 
 if __name__ == "__main__":

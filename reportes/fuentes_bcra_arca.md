@@ -2,7 +2,7 @@
 
 Complemento de la Fase 1 ([estudio del 24DSF](estudio_24dsf.md)). Revisa los paquetes mensuales que acompañan al bianual y el padrón de ARCA: qué traen, si coinciden con su diseño de registro y qué aportan a las variables.
 
-- **Conversión**: [`estudios/convertir_paquete_mensual.py`](../estudios/convertir_paquete_mensual.py) (ancho fijo → Parquet, valida el largo de cada registro contra el LEAME antes de convertir).
+- **Conversión**: [`src/cendeu/paquete.py`](../src/cendeu/paquete.py) (ancho fijo → Parquet, valida el largo de cada registro contra el LEAME antes de convertir).
 - **Referencias generadas** (públicas, sin datos personales): [`referencias/entidades.csv`](../referencias/entidades.csv) y [`referencias/entidades_equivalencias.csv`](../referencias/entidades_equivalencias.csv).
 
 ## Inventario

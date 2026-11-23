@@ -81,6 +81,20 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--vars-v1", nargs="*", default=[], help="OBS=Parquet de variables v1, p. ej. 202603=data/vars_202603_d6.parquet")
     p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json")
 
+    p = sub.add_parser("actualizar", help="corte mensual: de los paquetes de ARCA a base, variables y S3, con controles")
+    p.add_argument("--entrada", default="~/Downloads", help="carpeta (o s3://…) con los paquetes bajados de ARCA")
+    p.add_argument("--datos", required=True, help="carpeta de datos (deudores_24m, deudores_mensual, …, v2/base, v2/variables)")
+    p.add_argument("--corte", type=int, help="AAAAMM (default: el mes siguiente al último de deudores_24m)")
+    p.add_argument("--detectar", action="store_true", help="sólo dice si el corte está completo en la entrada (sale con 1 si falta algo)")
+    p.add_argument("--hasta", choices=["convertir", "ipc", "controles", "promover", "base", "variables", "monitoreo", "subir", "resumen"],
+                   help="último paso a correr (p. ej. controles para revisar antes de promover)")
+    p.add_argument("--rehacer", choices=["convertir", "ipc", "controles", "promover", "base", "variables", "monitoreo", "subir", "resumen"],
+                   help="vuelve a correr desde este paso")
+    p.add_argument("--recalcular", action="store_true", help="rehace también las variables de las fechas que ya existían")
+    p.add_argument("--forzar", action="store_true", help="sigue aunque algún control dé error")
+    p.add_argument("--simular-s3", action="store_true", help="no sube nada: sólo muestra qué subiría")
+    p.add_argument("--perfil", default="fmargara")
+
     p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
     p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
     p.add_argument("--perfil", default="fmargara")
@@ -141,6 +155,17 @@ def main(argv: list[str] | None = None) -> None:
         v1 = {int(o): r for o, r in (x.split("=", 1) for x in a.vars_v1)}
         validacion_v2.validar(a.dir_variables, a.catalogo, a.salida, vars_v1=v1 or None,
                               modelo_v1=a.modelo_v1 if v1 else None)
+    elif a.cmd == "actualizar":
+        from pathlib import Path
+        from . import actualizar
+        corte = a.corte or actualizar.proximo_corte(Path(a.datos).expanduser())
+        if a.detectar:
+            entrada = actualizar.sincronizar_entrada(a.entrada, Path(a.datos).expanduser() / "_actualizaciones" / str(corte) / "entrada", a.perfil)
+            d = actualizar.detectar(entrada, corte)
+            print(json.dumps(d, indent=2, ensure_ascii=False))
+            raise SystemExit(0 if d["completo"] else 1)
+        actualizar.actualizar(corte, a.entrada, a.datos, recalcular=a.recalcular, hasta=a.hasta, rehacer=a.rehacer,
+                              forzar=a.forzar, simular_s3=a.simular_s3, perfil=a.perfil, memoria=a.memoria)
     elif a.cmd == "subir":
         filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
         malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]
