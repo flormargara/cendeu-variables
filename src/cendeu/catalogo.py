@@ -70,6 +70,10 @@ def cargar(ruta: str | Path) -> Catalogo:
     for entrada in meta["variables"]:
         for v in _expandir(entrada, meta):
             variables.append({**defaults, **v})
+    por_unidad, default = meta.get("decimales_por_unidad") or {}, meta.get("decimales_default", 4)
+    for v in variables:
+        if v.get("tipo_dato") == "DECIMAL" and v.get("decimales") is None:
+            v["decimales"] = por_unidad.get(v.get("unidad"), default)
     cat = Catalogo(meta=meta, variables=variables)
     cat.errores = validar(cat)
     for v in variables:
@@ -103,6 +107,8 @@ def validar(cat: Catalogo) -> list[str]:
                 errores.append(f"{n}: fuente {f.strip()} desconocida")
         if v.get("tipo_dato") not in TIPOS_DATO:
             errores.append(f"{n}: tipo_dato {v.get('tipo_dato')} inválido")
+        if v.get("decimales") is not None and (v.get("tipo_dato") != "DECIMAL" or not isinstance(v["decimales"], int)):
+            errores.append(f"{n}: decimales sólo para DECIMAL y entero")
         if v.get("uso") not in USOS:
             errores.append(f"{n}: uso {v.get('uso')} inválido")
         for c in ("nombre", "descripcion", "sql"):
@@ -157,7 +163,7 @@ def filas_diccionario(cat: Catalogo, seleccion: dict[str, dict] | None = None,
             "NULOS": v["nulos"], "LINK": f"{link_doc}#{v['bloque'].lower()}",
             "OBSERVACIONES": " ".join(str(v.get("observaciones", "")).split()),
             "BLOQUE": v["bloque"], "USO": v["uso"], "SENTIDO ESPERADO": v.get("sentido", ""),
-            "UNIDAD": v.get("unidad", ""), "DISPONIBLE DESDE": v.get("disponible_desde", ""), "SQL": v["sql"],
+            "UNIDAD": v.get("unidad", "") + (f" ({v['decimales']} decimales)" if v.get("decimales") is not None else ""), "DISPONIBLE DESDE": v.get("disponible_desde", ""), "SQL": v["sql"],
             "IV": s["iv"] if s else "", "GRUPO": s["grupo"] if s else "", "RECOMENDADA": _rec(s),
             "RECOMENDADA SIT1": _rec(s, "sit1"), "RECOMENDADA SIT2": _rec(s, "sit2"),
         })

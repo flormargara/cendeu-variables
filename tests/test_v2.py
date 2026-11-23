@@ -98,7 +98,7 @@ def test_calidad_y_transiciones(resultado):
     assert a.CEN_MAX_SIT_12M == 3 and a.CEN_MAX_SIT_3M == 1
     assert a.CEN_CNT_MESES_SIT2P_12M == 3
     assert a.CEN_RCM_SIT2P_12M == 3 and a.CEN_RCM_SIT3P_12M == 4
-    assert a.CEN_RAT_CURA_12M == pytest.approx(1 / 3)
+    assert a.CEN_RAT_CURA_12M == pytest.approx(1 / 3, abs=1e-4)   # guardada con 4 decimales
     assert a.CEN_RAT_ROLL_2A3_12M == pytest.approx(0.5)
     assert a.CEN_MAX_RACHA_SIT2P_12M == 3 and a.CEN_CNT_RACHA_SIT2P_1M == 0 and a.CEN_CNT_RACHA_SIT1_1M == 3
     assert pd.isna(a.CEN_CNT_MESES_SIT1_ININT_1M)        # foto del 1DSF (202609): nula antes del corte
@@ -110,7 +110,7 @@ def test_magnitud_velocidad_mix(resultado):
     a = resultado[0].loc[A]
     assert a.CEN_MTO_DEUDA_1M == pytest.approx(150)
     assert a.CEN_CNT_ENT_1M == 2 and a.CEN_CNT_ALTAS_3M == 1 and a.CEN_CNT_ALTAS_12M == 1
-    assert a.CEN_PCT_DEUDA_PNFC_1M == pytest.approx(1 / 3)
+    assert a.CEN_PCT_DEUDA_PNFC_1M == pytest.approx(1 / 3, abs=1e-4)
     assert a.CEN_CNT_TIPOS_ENT_1M == 2
     assert a.CEN_TEN_DEUDA_3M == pytest.approx(1.0)
     assert pd.isna(a.CEN_RSI_DEUDA_3M)          # sin variaciones en la ventana
@@ -204,3 +204,15 @@ def test_subir_rechaza_muestras(entorno, resultado):
     with pytest.raises(ValueError, match="muestra"):
         s3.subir(tmp / "vars_s3", "variables", simular=True)
     assert s3.subir(tmp / "vars", "variables", simular=True)   # la población completa sí
+
+
+def test_decimales_y_precision_simple(resultado):
+    r = resultado[0]
+    from cendeu.catalogo import cargar
+    cat = {v["nombre"]: v for v in cargar(RAIZ / "catalogo" / "variables.yaml").variables}
+    assert cat["CEN_MTO_DEUDA_1M"]["decimales"] == 1 and cat["CEN_RSI_DEUDA_6M"]["decimales"] == 2
+    assert cat["CEN_RAT_CURA_12M"]["decimales"] == 4 and "decimales" not in cat["CEN_MAX_SIT_12M"]
+    decimales = [n for n, v in cat.items() if v["tipo_dato"] == "DECIMAL"]
+    assert all(str(r[n].dtype) == "float32" for n in decimales)
+    # el valor guardado es el redondeo (salvo el error de representación de float32)
+    assert float(r.loc[A, "CEN_RAT_CURA_12M"]) == pytest.approx(0.3333, abs=1e-7)

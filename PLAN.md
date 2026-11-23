@@ -66,6 +66,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 ## Lecciones de la implementación
 
+- **Tamaño de las variables**: el 92% del peso eran las 74 variables decimales guardadas en doble precisión con todos sus decimales (ruido de la deflación, casi incompresible). Desde el 2026-11-23 se guardan redondeadas por unidad (montos a 1 decimal, índices 0-100 a 2, el resto a 4) y en precisión simple, con zstd nivel 9: cada fecha pasa de ~5 GB a ~2,5 GB, sin cambiar enteros ni categóricas (las 8 fechas: 37 → 19 GB). El informe de poder sobre las variables compactas da los mismos signos, grupos y recomendaciones; IV, Gini y PSI se mueven menos de 0,001. El redondeo explica casi todo el ahorro; la precisión simple suma poco. Si alguna vez hicieran falta más decimales, se reprocesa desde los crudos (`~/projects/cendeu-crudos/`).
+
 - **Archivo de control del 24DSF**: trae 25 meses (el del corte 202609 incluye 202409) y en 214 pares entidad × mes duplica cantidad y monto. El control compara sólo los 24 meses del archivo y acepta el duplicado.
 
 - **Fotos del corte**: el 1DSF y el padrón son fotos de hoy. El 1DSF filtraba el desempeño (IV 7,5 falso), por eso las variables tienen `disponible_desde` y quedan nulas en fechas anteriores a su fuente. Actividad y provincia del padrón no mostraron señales de fuga (PSI ≈ 0), pero siguen siendo fotos.

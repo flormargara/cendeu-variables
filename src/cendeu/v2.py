@@ -57,7 +57,8 @@ CREATE OR REPLACE MACRO tipo_persona(c) AS
 """
 
 TIPOS = ["BANCO", "CIA_FIN", "TARJETA_NB", "PNFC", "FIDEICOMISO"]
-TIPO_SQL = {"DECIMAL": "DOUBLE", "INTEGER": "INTEGER", "FLAG": "INTEGER", "CATEGORICA": "VARCHAR"}
+TIPO_SQL = {"DECIMAL": "FLOAT", "INTEGER": "INTEGER", "FLAG": "INTEGER", "CATEGORICA": "VARCHAR"}
+ZSTD = "COMPRESSION zstd, COMPRESSION_LEVEL 9"
 BANCARIOS = "('BANCO', 'CIA_FIN')"
 
 # ----------------------------------------------------------------------------- modo muestra
@@ -339,6 +340,8 @@ def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool, prim
         if v.get("requiere_mes_previo") and periodo_mas(t, -v["ventana_meses"]) < primero:
             expr = "NULL"
         # tipo fijo por variable: una variable anulada conserva su tipo y las partes se pueden leer juntas
+        if v["tipo_dato"] == "DECIMAL":   # se calcula en doble y se guarda redondeado en simple
+            expr = f"round(({expr})::DOUBLE, {v['decimales']})"
         expr = f"({expr})::{TIPO_SQL[v['tipo_dato']]}"
         (capa2 if v.get("capa") == 2 else capa1).append(f"({expr}) AS {v['nombre']}")
     return ",\n        ".join(capa1), ",\n        ".join(capa2)
@@ -440,7 +443,7 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                       {capa1}
                     FROM s JOIN x2 x USING (cuit) LEFT JOIN per USING (cuit) LEFT JOIN mm USING (cuit) LEFT JOIN tgt USING (cuit))
                   SELECT *{(", " + capa2) if capa2 else ""} FROM v1
-                ) TO '{_q(tmp_parte)}' (FORMAT parquet, COMPRESSION zstd)
+                ) TO '{_q(tmp_parte)}' (FORMAT parquet, {ZSTD})
             """)
             tmp_parte.rename(parte)  # una parte sólo existe si se escribió completa
             n = con.execute("SELECT count(*) FROM s").fetchone()[0]
