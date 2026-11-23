@@ -21,7 +21,7 @@ Requiere Python ≥ 3.10. Para descomprimir los archivos del BCRA hace falta `7z
 | Carpeta | Contenido |
 |---|---|
 | [`catalogo/variables.yaml`](catalogo/variables.yaml) | Fuente única de las variables v2: nombre, definición, fuente, nulos, uso y expresión SQL de cada una |
-| [`src/cendeu/`](src/cendeu/) | Paquete: `v2.py` (base y variables), `actualizar.py` (corte mensual), `paquete.py` (conversor del paquete mensual), `catalogo.py` (carga, validación y documentación), `poder.py` (informe de poder), `validacion_v2.py` (validación multivariada), `s3.py` (subida), `pipeline.py`, `scorecard.py` y `scoring.py` (v1) |
+| [`src/cendeu/`](src/cendeu/) | Paquete: `v2.py` (base y variables), `actualizar.py` (corte mensual), `revisar.py` (revisión programada), `paquete.py` (conversor del paquete mensual), `catalogo.py` (carga, validación y documentación), `poder.py` (informe de poder), `validacion_v2.py` (validación multivariada), `s3.py` (subida), `pipeline.py`, `scorecard.py` y `scoring.py` (v1) |
 | [`referencias/`](referencias/) | Datos públicos versionados: IPC INDEC, tipo de entidad, fideicomisos de recupero y equivalencias por fusiones |
 | [`docs/`](docs/) | Documento técnico y diccionario de variables (generados desde el catálogo) y el informe de variables mix |
 | [`reportes/`](reportes/) | Estudio del 24DSF, fuentes BCRA y ARCA, informe de poder v2 y su página, validación multivariada |
@@ -96,13 +96,13 @@ Con cada corte nuevo, lo único manual es bajar de ARCA los seis paquetes del pu
 
 ```bash
 # ¿Llegó el corte? (sale con 1 si falta algún paquete; el corte por defecto es el mes siguiente al último cargado)
-cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads --detectar
+cendeu actualizar --datos ~/cendeu/datos --entrada ~/cendeu/entrada --detectar
 
 # Hasta los controles, para revisar antes de tocar nada
-cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads --hasta controles
+cendeu actualizar --datos ~/cendeu/datos --entrada ~/cendeu/entrada --hasta controles
 
 # Todo: promueve, arma base y variables, mide PSI, sube a S3 y escribe reportes/actualizaciones/AAAAMM.md
-cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads
+cendeu actualizar --datos ~/cendeu/datos --entrada ~/cendeu/entrada
 ```
 
 | Paso | Qué hace |
@@ -116,6 +116,17 @@ cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads
 | `monitoreo` | PSI de cada variable de las fechas nuevas contra la última fecha que ya existía |
 | `subir` | S3 y registro en `_control/` (`--simular-s3` para ver qué subiría) |
 | `resumen` | `reportes/actualizaciones/AAAAMM.md` |
+
+**Revisión programada.** `cendeu programar` instala una tarea de launchd que todos los días a las 9:00 (o al despertar la Mac, si estaba dormida) corre `cendeu revisar`. Si los seis paquetes del corte están en `~/cendeu/entrada`, `cendeu revisar` corre la actualización completa, **incluida la subida a S3**, y avisa con una notificación de macOS al empezar y al terminar. Si llegó sólo una parte o un control frena, avisa una vez. El log queda en `~/cendeu/datos/_actualizaciones/revisar.log`.
+
+```bash
+cendeu programar                 # instala (--hora 7 --minuto 30 para otro horario)
+cendeu programar --estado        # muestra la tarea y el final del log
+cendeu programar --ahora         # la dispara sin esperar a la hora
+cendeu programar --quitar        # la desinstala
+```
+
+launchd no puede leer `~/Downloads` ni `~/Documents` (macOS lo bloquea): por eso los datos están en `~/cendeu/datos` y los paquetes de ARCA se dejan en `~/cendeu/entrada`. La tarea corre el código del repo tal como esté en el disco (la rama que tenga checkout) y, al terminar, deja sin commitear el resumen en `reportes/actualizaciones/` y, si cambió, `referencias/ipc.csv`.
 
 Todo lo nuevo se arma en `<datos>/_actualizaciones/AAAAMM/` y se mueve a su lugar después de los controles. El estado de cada paso queda en `estado.json`: si una corrida se corta, la siguiente retoma desde el primer paso pendiente; `--rehacer PASO` vuelve a correr desde ese paso. Si un control da error (por ejemplo, una entidad nueva sin tipo), se corrige la referencia y se corre `--rehacer controles`.
 

@@ -10,6 +10,7 @@ Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA,
 | Ventanas | 3, 6 y 12 meses. |
 | Target | Situación ≥3 en los **6 meses** siguientes (permite varias fechas de observación, validación *out-of-time* y PSI). Target a 12 meses queda para iteraciones futuras. |
 | IPC | INDEC vía datos.gob.ar, versionado en [`referencias/ipc.csv`](referencias/ipc.csv) y copiado por corte a S3; cada base registra su hash y meses imputados en `_meta.json`. |
+| Datos locales | `~/cendeu/datos` (fuentes convertidas, `v2/base`, `v2/variables`) y `~/cendeu/entrada` para los paquetes de ARCA; fuera de `~/Downloads` porque launchd no puede leerlo. |
 | Almacenamiento | `s3://data-cendeu-raw` (perfil `fmargara`, política [`infra/cendeu-s3-policy.json`](infra/cendeu-s3-policy.json)), una carpeta por período. |
 | v1 | Variables y scores v1 se subieron sólo como línea de base y se borraron de S3 el 2026-11-15, al quedar la v2 completa (*fresh start*, registro en `_control/borrados.csv`). |
 | Repo | Se mantiene el repo actual; el rediseño se hace sobre él. |
@@ -50,7 +51,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | [`docs/variables_mix.md`](docs/variables_mix.md) | hecho (diseño; implementar cuando haya datos propios) |
 | 5 | Informe de variables y poder (IV, Gini, KS, nulos, PSI, correlaciones, valor incremental vs scorecard v1) | [`reportes/poder_v2/`](reportes/poder_v2/) (`cendeu poder`) y su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/), publicada como artifact en claude.ai | hecho: 99 de 139 variables con IV ≥ 0,1, 60 grupos no redundantes, PSI máximo 0,034; repetido por segmento (sit1 y sit2) con selección recomendada en `catalogo/seleccion.csv` |
 | 6 | Validación multivariada de las variables (ajuste por segmento sólo como prueba, no como modelo) | [`reportes/validacion_v2/`](reportes/validacion_v2/) (`cendeu validar-v2`) | hecho |
-| 7 | Actualización mensual automatizada | `cendeu actualizar` ([`src/cendeu/actualizar.py`](src/cendeu/actualizar.py)), resumen por corte en [`reportes/actualizaciones/`](reportes/actualizaciones/) | etapa 1 hecha (comando con controles, probado con el corte 202609); falta la detección programada y, opcional, correrlo en AWS |
+| 7 | Actualización mensual automatizada | `cendeu actualizar` ([`src/cendeu/actualizar.py`](src/cendeu/actualizar.py)), resumen por corte en [`reportes/actualizaciones/`](reportes/actualizaciones/) | etapas 1 y 2 hechas: comando con controles (probado con el corte 202609) y revisión diaria en launchd (`cendeu programar`, instalada el 2026-11-23); opcional: correrlo en AWS |
 
 ## Resultados de la Fase 5
 
@@ -75,7 +76,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 ## Pendientes
 
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
-- Actualización mensual, etapa 2: tarea programada que corre `cendeu actualizar --detectar` (el paquete de 202609 tiene fecha de proceso 2026-11-05, así que 202610 debería llegar a principios de diciembre) y, si el corte está completo, la actualización completa con aviso.
+- Corte 202610: bajar los seis paquetes de ARCA a `~/cendeu/entrada` cuando estén (el de 202609 se procesó el 2026-11-05, así que se espera a principios de diciembre); la revisión diaria hace el resto.
 - Actualización mensual, etapa 3 (opcional): correrla en AWS con el rol `data-cendeu`, disparada al llegar los paquetes a `s3://data-cendeu-raw/entrada/AAAAMM/`.
 - Decidir si cada corte recalcula las fechas anteriores (`--recalcular`, ~1,5 h más) o sólo agrega las nuevas (default).
 
