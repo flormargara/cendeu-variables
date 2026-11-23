@@ -64,12 +64,11 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 
 - **Fotos del corte**: el 1DSF y el padrón son fotos de hoy. El 1DSF filtraba el desempeño (IV 7,5 falso), por eso las variables tienen `disponible_desde` y quedan nulas en fechas anteriores a su fuente. Actividad y provincia del padrón no mostraron señales de fuga (PSI ≈ 0), pero siguen siendo fotos.
 - **Borde de la historia**: las variables que necesitan el mes previo a su ventana (`requiere_mes_previo`) quedan nulas cuando ese mes no está en el 24DSF (202509 para ventanas de 12 meses).
-- **Memoria**: la base se escribe bucket por bucket y las variables por partes de ~1,3 M de CUITs con 10 GB; con menos memoria fallan pasos que DuckDB no vuelca a disco. Para iterar en desarrollo conviene una muestra fija (20% de los CUITs) y dejar la población completa para scorear en producción.
+- **Memoria**: la base se escribe bucket por bucket y las variables por partes de ~1,3 M de CUITs con 10 GB; con menos memoria fallan pasos que DuckDB no vuelca a disco. Para iterar en desarrollo está el modo muestra (`variables-v2 --pct-muestra 30`, ver README) y la población completa queda para la corrida que se sube a S3.
 - **Reproducibilidad**: los montos tienen ruido de punto flotante entre corridas (sumas en paralelo, ≤ 1e-7); los enteros y categóricas son idénticos.
 
 ## Pendientes
 
-- Modo muestra para desarrollo en `cendeu variables-v2`.
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
 
 ## Bloques de variables (Fase 2)

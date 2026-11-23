@@ -37,7 +37,8 @@ def _filas():
 
 
 @pytest.fixture(scope="module")
-def resultado(tmp_path_factory):
+def entorno(tmp_path_factory):
+    """Base v2 sintética: (dir de la base, catálogo, dir temporal)."""
     tmp = tmp_path_factory.mktemp("v2")
     con = duckdb.connect()
     df = pd.DataFrame(_filas(), columns=["entidad", "cuit", "situacion", "monto", "periodo"])
@@ -70,7 +71,13 @@ def resultado(tmp_path_factory):
     base = v2.construir_base(tmp / "d24", tmp / "base", tmp / "ipc.csv", RAIZ / "referencias",
                              mensual=tmp / "men", padron=tmp / "padron.parquet", uno_dsf=tmp / "1dsf.parquet",
                              n_buckets=2, memory_limit="1GB")
-    cat = RAIZ / "catalogo" / "variables.yaml"
+    return base, RAIZ / "catalogo" / "variables.yaml", tmp
+
+
+@pytest.fixture(scope="module")
+def resultado(entorno):
+    base, cat, tmp = entorno
+    con = duckdb.connect()
     out = v2.construir_variables(base, OBS, tmp / "vars", cat, n_buckets=2, memory_limit="1GB")
     out9 = v2.construir_variables(base, 202609, tmp / "vars", cat, n_buckets=2, memory_limit="1GB")
     out0 = v2.construir_variables(base, 202509, tmp / "vars", cat, n_buckets=2, memory_limit="1GB")
@@ -164,3 +171,36 @@ def test_sin_mes_previo_queda_nula(resultado):
     assert r0["CEN_CNT_ALTAS_12M"].isna().all() and r0["CEN_RAT_CURA_12M"].isna().all()
     assert r0["CEN_CNT_ALTAS_3M"].notna().all() and r0["CEN_CNT_ALTAS_6M"].notna().all()
     assert r0["CEN_MAX_SIT_12M"].notna().all()
+
+
+def test_modo_muestra(entorno, resultado):
+    base, cat, tmp = entorno
+    completa = resultado[0]
+    con = duckdb.connect()
+    pct = 50
+    esperados = {c for c in completa.index if con.execute(f"SELECT hash({c}::BIGINT) % 100 < {pct}").fetchone()[0]}
+    assert 0 < len(esperados) < len(completa)   # la prueba distingue incluidos de excluidos
+    out = v2.construir_variables(base, OBS, tmp / "vars_m", cat, n_buckets=2, memory_limit="1GB", pct_muestra=pct)
+    m = con.execute(f"SELECT * FROM read_parquet('{out}/*.parquet')").df().set_index("CUIT")
+    assert set(m.index) == esperados
+    # mismos valores que en la población completa para los CUITs de la muestra
+    pd.testing.assert_frame_equal(m.sort_index(), completa.loc[sorted(esperados), m.columns], check_dtype=False)
+    assert v2.pct_muestra_de(tmp / "vars_m") == pct and v2.pct_muestra_de(tmp / "vars") == 100
+    # la muestra de un informe con porcentaje menor queda contenida; uno mayor falla
+    v2.verificar_muestra(tmp / "vars_m", 10)
+    with pytest.raises(ValueError, match="muestra del 50%"):
+        v2.verificar_muestra(tmp / "vars_m", 60)
+    # no se mezclan porcentajes en una carpeta
+    with pytest.raises(ValueError, match="ya tiene partes"):
+        v2.construir_variables(base, OBS, tmp / "vars", cat, n_buckets=2, memory_limit="1GB", pct_muestra=pct)
+    with pytest.raises(ValueError, match="ya tiene partes"):
+        v2.construir_variables(base, OBS, tmp / "vars_m", cat, n_buckets=2, memory_limit="1GB")
+
+
+def test_subir_rechaza_muestras(entorno, resultado):
+    from cendeu import s3
+    base, cat, tmp = entorno
+    v2.construir_variables(base, OBS, tmp / "vars_s3", cat, n_buckets=2, buckets=[0], memory_limit="1GB", pct_muestra=30)
+    with pytest.raises(ValueError, match="muestra"):
+        s3.subir(tmp / "vars_s3", "variables", simular=True)
+    assert s3.subir(tmp / "vars", "variables", simular=True)   # la población completa sí

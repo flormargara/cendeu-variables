@@ -117,6 +117,8 @@ def metricas_variable(t: pd.DataFrame, fechas_dev: list[int], fechas_oot: list[i
 
 # ----------------------------------------------------------------------------- muestra y bins en DuckDB
 def _muestra(con, dir_vars: Path, columnas: list[str], target: str, pct: int) -> None:
+    from .v2 import verificar_muestra
+    verificar_muestra(dir_vars, pct)
     cols = ", ".join(f'"{c}"' for c in columnas)
     con.execute(f"""
         CREATE OR REPLACE TABLE mu AS

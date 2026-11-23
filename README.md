@@ -58,6 +58,9 @@ cendeu base data/deudores_24m data/v2/base --mensual data/deudores_mensual \
 # Variables del catálogo a cada fecha de observación (con target a 6 meses si hay desempeño)
 cendeu variables-v2 data/v2/base data/v2/variables --obs 202509 202510 202511 202512 202601 202602 202603
 
+# Modo desarrollo: sólo el 30% de los CUITs (hash del CUIT, el mismo criterio que poder y validar-v2), en otra carpeta
+cendeu variables-v2 data/v2/base data/v2/variables_m30 --pct-muestra 30 --obs 202509 202510 202511 202512 202601 202602 202603
+
 # Informe de poder (muestra del 10%) y valor incremental contra el scorecard v1
 cendeu poder data/v2/variables --vars-v1 data/vars_cendeu_202509.parquet
 cendeu pagina-poder          # CSV de la página del informe
@@ -77,6 +80,8 @@ cendeu subir data/v2/variables variables
 Si una subida se corta por la red, `aws s3 sync <carpeta> s3://data-cendeu-raw/<prefijo> --profile fmargara` copia sólo lo que falta; después conviene volver a comparar los tamaños.
 
 Tiempos de referencia (M-series, 10 núcleos, 16 GB, `--memoria 10GB`): base ~6 min; variables ~45 s por parte de ~1,3 M de CUITs (16 partes por fecha, ~12 min por fecha); informe de poder, unos minutos. Con menos de 10 GB fallan pasos que DuckDB no puede volcar a disco. `variables-v2 --retomar` saltea las partes ya escritas si una corrida se corta.
+
+**Modo muestra** (`variables-v2 --pct-muestra N`): para iterar sobre el catálogo sin recalcular toda la población. Toma los CUITs con `hash(CUIT) % 100 < N`, el mismo criterio de `poder` (10%) y `validar-v2` (3% en situación 1, 30% en situación 2), así que sus muestras quedan contenidas en la de las variables y los valores son idénticos a los de la población completa para esos CUITs. Con 30% alcanza para todos los informes. Cada fecha guarda la muestra en `_muestra.json`; no se mezclan porcentajes en una carpeta, `poder` y `validar-v2` fallan si se les pide más porcentaje del que hay, y `cendeu subir` rechaza las muestras (a S3 va sólo la población completa).
 
 Cada base guarda en `_meta.json` el hash del IPC y de las referencias que usó, y si algún mes del IPC estaba imputado.
 
