@@ -27,6 +27,8 @@ from . import catalogo as cat_mod
 
 N_BINS = 10
 MIN_CAT = 0.01  # categorías con menos del 1% de desarrollo van a OTRAS
+# Segmentos del informe (mismos que la validación multivariada): situación en el mes de observación
+SEGMENTOS = {"sit1": "CEN_MAX_SIT_1M = 1", "sit2": "CEN_MAX_SIT_1M = 2"}
 
 
 # ----------------------------------------------------------------------------- métricas sobre bins
@@ -116,7 +118,7 @@ def metricas_variable(t: pd.DataFrame, fechas_dev: list[int], fechas_oot: list[i
 
 
 # ----------------------------------------------------------------------------- muestra y bins en DuckDB
-def _muestra(con, dir_vars: Path, columnas: list[str], target: str, pct: int) -> None:
+def _muestra(con, dir_vars: Path, columnas: list[str], target: str, pct: int, filtro: str | None = None) -> None:
     from .v2 import verificar_muestra
     verificar_muestra(dir_vars, pct)
     cols = ", ".join(f'"{c}"' for c in columnas)
@@ -124,7 +126,7 @@ def _muestra(con, dir_vars: Path, columnas: list[str], target: str, pct: int) ->
         CREATE OR REPLACE TABLE mu AS
         SELECT PERIODO_OBS AS obs, "{target}" AS y, {cols}
         FROM read_parquet('{dir_vars}/periodo_obs=*/*.parquet', union_by_name = true)
-        WHERE EN_POBLACION = 1 AND "{target}" IS NOT NULL AND hash(CUIT) % 100 < {pct}
+        WHERE EN_POBLACION = 1 AND "{target}" IS NOT NULL AND hash(CUIT) % 100 < {pct}{f" AND ({filtro})" if filtro else ""}
     """)
 
 
@@ -219,7 +221,10 @@ def incremental_v1(con, vars_v1: str | Path, modelo_v1: str | Path, obs: int, va
 # ----------------------------------------------------------------------------- orquestación
 def informe(dir_vars: str | Path, catalogo: str | Path, dst: str | Path, fechas_oot: list[int] | None = None,
             pct_muestra: int = 10, vars_v1: str | Path | None = None, modelo_v1: str | Path | None = None,
-            obs_v1: int = 202509, memory_limit: str = "10GB") -> pd.DataFrame:
+            obs_v1: int = 202509, memory_limit: str = "10GB", segmento: str | None = None) -> pd.DataFrame:
+    """``segmento``: clave de ``SEGMENTOS`` para medir el poder dentro de situación 1 o situación 2."""
+    if segmento is not None and segmento not in SEGMENTOS:
+        raise ValueError(f"segmento desconocido: {segmento} (opciones: {', '.join(SEGMENTOS)})")
     cat = cat_mod.cargar(catalogo)
     target = cat.meta["targets"][0]["nombre"]
     evaluables = [v for v in cat.variables if v["uso"] in ("modelo", "monitoreo")]
@@ -228,7 +233,7 @@ def informe(dir_vars: str | Path, catalogo: str | Path, dst: str | Path, fechas_
     dst.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
     con.execute(f"SET memory_limit = '{memory_limit}'; SET preserve_insertion_order = false;")
-    _muestra(con, Path(dir_vars), list(meta) + ["CUIT"], target, pct_muestra)
+    _muestra(con, Path(dir_vars), list(meta) + ["CUIT"], target, pct_muestra, SEGMENTOS.get(segmento))
     fechas = [r[0] for r in con.execute("SELECT DISTINCT obs FROM mu ORDER BY 1").fetchall()]
     oot = fechas_oot if fechas_oot is not None else fechas[-2:]
     dev = [f for f in fechas if f not in oot]
@@ -258,6 +263,7 @@ def informe(dir_vars: str | Path, catalogo: str | Path, dst: str | Path, fechas_
     bins[["variable", "bin", "n", "malos", "tasa", "woe"]].to_csv(dst / "bins.csv", index=False, float_format="%.6f")
     grupos.to_csv(dst / "grupos.csv", index=False, float_format="%.4f")
     info = {"fechas_desarrollo": dev, "fechas_oot": oot, "pct_muestra": pct_muestra, "target": target,
+            "segmento": segmento, "filtro_segmento": SEGMENTOS.get(segmento),
             "n_por_fecha": pf.groupby("obs").n.first().to_dict(), "tasa_por_fecha": pf.groupby("obs").tasa_target.first().to_dict()}
     if vars_v1 and modelo_v1:
         top = res[(res.uso == "modelo") & (res.grupo == res.variable)].variable.head(30).tolist()
@@ -266,6 +272,24 @@ def informe(dir_vars: str | Path, catalogo: str | Path, dst: str | Path, fechas_
         info["incremental_obs"] = obs_v1
     (dst / "info.json").write_text(json.dumps(info, indent=2, default=str), encoding="utf-8")
     return res
+
+
+# ----------------------------------------------------------------------------- sentidos
+def actualizar_sentidos(dir_reporte: str | Path, catalogo: str | Path) -> int:
+    """Recalcula ``sentido_esperado`` y ``sentido_ok`` de ``resumen.csv`` con el catálogo actual, sin volver a
+    leer las variables (el sentido observado no depende del catálogo). Devuelve cuántas filas cambiaron."""
+    cat = cat_mod.cargar(catalogo)
+    esperado = {v["nombre"]: str(v.get("sentido", "")) for v in cat.variables}
+    ruta = Path(dir_reporte) / "resumen.csv"
+    r = pd.read_csv(ruta, keep_default_na=False, na_values=[""])
+    norm = lambda d: d[["sentido_esperado", "sentido_ok"]].astype("string").fillna("")
+    antes = norm(r)
+    r["sentido_esperado"] = r.variable.map(esperado).fillna(r.sentido_esperado)
+    obs = r.sentido_observado.fillna("")
+    r["sentido_ok"] = [(o == e) if e in ("+", "-") and o else None for o, e in zip(obs, r.sentido_esperado.fillna(""))]
+    cambios = int((norm(r) != antes).any(axis=1).sum())
+    r.to_csv(ruta, index=False, float_format="%.6f")
+    return cambios
 
 
 # ----------------------------------------------------------------------------- archivos de la página
@@ -302,14 +326,8 @@ def archivos_pagina(dir_reporte: str | Path, catalogo: str | Path, dst: str | Pa
 IV_MIN, PSI_MAX = 0.1, 0.1
 
 
-def seleccion(dir_reporte: str | Path, dst: str | Path, iv_min: float = IV_MIN, psi_max: float = PSI_MAX) -> pd.DataFrame:
-    """Marca las variables recomendadas como punto de partida para un modelo y escribe ``catalogo/seleccion.csv``.
-
-    No recorta nada: todas las variables del catálogo se siguen calculando. Recomendada = uso ``modelo``,
-    IV >= ``iv_min``, PSI máximo < ``psi_max`` y representante de su grupo de correlación (las categóricas no
-    se agrupan y cuentan como su propio grupo). La elección final depende de cada modelo (segmento, objetivo).
-    """
-    r = pd.read_csv(Path(dir_reporte) / "resumen.csv")
+def _marcar(r: pd.DataFrame, iv_min: float, psi_max: float) -> pd.DataFrame:
+    r = r.copy()
     r["grupo"] = r.grupo.fillna(r.variable)
     r["representante"] = r.grupo == r.variable
     motivos = []
@@ -326,8 +344,30 @@ def seleccion(dir_reporte: str | Path, dst: str | Path, iv_min: float = IV_MIN, 
         motivos.append("; ".join(m))
     r["motivo_no"] = motivos
     r["recomendada"] = r.motivo_no == ""
+    return r
+
+
+def seleccion(dir_reporte: str | Path, dst: str | Path, segmentos: dict[str, str | Path] | None = None,
+              iv_min: float = IV_MIN, psi_max: float = PSI_MAX) -> pd.DataFrame:
+    """Marca las variables recomendadas como punto de partida para un modelo y escribe ``catalogo/seleccion.csv``.
+
+    No recorta nada: todas las variables del catálogo se siguen calculando. Recomendada = uso ``modelo``,
+    IV >= ``iv_min``, PSI máximo < ``psi_max`` y representante de su grupo de correlación (las categóricas no
+    se agrupan y cuentan como su propio grupo). ``segmentos``: {nombre: informe de poder de ese segmento}; agrega
+    ``iv_<nombre>``, ``recomendada_<nombre>`` y ``motivo_no_<nombre>`` con el mismo criterio dentro del segmento
+    (una variable constante en el segmento no aparece en su informe y queda no recomendada).
+    """
+    r = _marcar(pd.read_csv(Path(dir_reporte) / "resumen.csv"), iv_min, psi_max)
     cols = ["variable", "recomendada", "iv", "gini_oot", "psi_max", "grupo", "representante", "motivo_no"]
-    out = r[cols].sort_values(["recomendada", "iv"], ascending=[False, False])
+    out = r[cols]
+    for nombre, d in (segmentos or {}).items():
+        s = _marcar(pd.read_csv(Path(d) / "resumen.csv"), iv_min, psi_max)
+        s = s[["variable", "iv", "recomendada", "motivo_no"]].rename(
+            columns={c: f"{c}_{nombre}" for c in ("iv", "recomendada", "motivo_no")})
+        out = out.merge(s, on="variable", how="left")
+        out[f"recomendada_{nombre}"] = out[f"recomendada_{nombre}"].astype("boolean").fillna(False).astype(bool)
+        out[f"motivo_no_{nombre}"] = out[f"motivo_no_{nombre}"].fillna("sin variación en el segmento")
+    out = out.sort_values(["recomendada", "iv"], ascending=[False, False])
     dst = Path(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(dst, index=False, float_format="%.4f")

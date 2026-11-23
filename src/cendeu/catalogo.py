@@ -117,7 +117,7 @@ COLUMNAS_DICCIONARIO = [
     # agregadas respecto de la plantilla CRC
     "BLOQUE", "USO", "SENTIDO ESPERADO", "UNIDAD", "DISPONIBLE DESDE", "SQL",
     # del informe de poder (`cendeu seleccion`)
-    "IV", "GRUPO", "RECOMENDADA",
+    "IV", "GRUPO", "RECOMENDADA", "RECOMENDADA SIT1", "RECOMENDADA SIT2",
 ]
 _TIPO = {"INTEGER": "int", "FLAG": "int", "DECIMAL": "float", "CATEGORICA": "string"}
 _CLASE = {"INTEGER": "numeric", "DECIMAL": "numeric", "FLAG": "binary", "CATEGORICA": "category"}
@@ -132,10 +132,11 @@ def cargar_seleccion(ruta: str | Path | None) -> dict[str, dict]:
         return {r["variable"]: r for r in csv.DictReader(f)}
 
 
-def _rec(s: dict | None) -> str:
-    if not s:
+def _rec(s: dict | None, segmento: str | None = None) -> str:
+    campo = f"recomendada_{segmento}" if segmento else "recomendada"
+    if not s or campo not in s:
         return ""
-    return "SI" if s["recomendada"] == "True" else "NO"
+    return "SI" if s[campo] == "True" else "NO"
 
 
 def filas_diccionario(cat: Catalogo, seleccion: dict[str, dict] | None = None,
@@ -158,6 +159,7 @@ def filas_diccionario(cat: Catalogo, seleccion: dict[str, dict] | None = None,
             "BLOQUE": v["bloque"], "USO": v["uso"], "SENTIDO ESPERADO": v.get("sentido", ""),
             "UNIDAD": v.get("unidad", ""), "DISPONIBLE DESDE": v.get("disponible_desde", ""), "SQL": v["sql"],
             "IV": s["iv"] if s else "", "GRUPO": s["grupo"] if s else "", "RECOMENDADA": _rec(s),
+            "RECOMENDADA SIT1": _rec(s, "sit1"), "RECOMENDADA SIT2": _rec(s, "sit2"),
         })
     return filas
 
@@ -242,15 +244,25 @@ def escribir_documento(cat: Catalogo, dst: str | Path, seleccion: dict[str, dict
                 "calculando, y la elección final depende del modelo que las use (segmento, objetivo). Detalle y motivo de "
                 "las no recomendadas en [`catalogo/seleccion.csv`](../catalogo/seleccion.csv); métricas en el "
                 "[informe de poder](../reportes/poder_v2/)."]
+        segs = [g for g in ("sit1", "sit2") if any(f"recomendada_{g}" in s for s in seleccion.values())]
+        if segs:
+            n = {g: sum(_rec(seleccion.get(v["nombre"]), g) == "SI" for v in cat.variables) for g in segs}
+            out += ["", "Como la población mezcla situación 1 y situación 2, muchas variables de magnitud y calidad "
+                    "separan sobre todo esos dos grupos. Por eso la selección se repite dentro de cada segmento, con el "
+                    "mismo criterio y su propio informe de poder ([situación 1](../reportes/poder_v2_sit1/), "
+                    "[situación 2](../reportes/poder_v2_sit2/)): "
+                    + ", ".join(f"**{n[g]}** recomendadas en {g}" for g in segs)
+                    + " (columnas **S1** y **S2**)."]
     for b, d in m["bloques"].items():
         out += ["", f'<a id="{b.lower()}"></a>', f"## {b} — {d}", "",
-                "| Variable | Descripción | Definición | Nulos | Sentido | Uso | IV | Rec. |", "|---|---|---|---|---|---|---|---|"]
+                "| Variable | Descripción | Definición | Nulos | Sentido | Uso | IV | Rec. | S1 | S2 |",
+                "|---|---|---|---|---|---|---|---|---|---|"]
         for v in (x for x in cat.variables if x["bloque"] == b):
             defi = " ".join(str(v["definicion"]).split()).replace("|", "\\|")
             s = seleccion.get(v["nombre"])
             iv = f"{float(s['iv']):.2f}".replace(".", ",") if s else ""
             out.append(f"| `{v['nombre']}` | {v['descripcion']} | {defi} | {v['nulos']} | {v.get('sentido', '')} | {v['uso']} "
-                       f"| {iv} | {_rec(s)} |")
+                       f"| {iv} | {_rec(s)} | {_rec(s, 'sit1')} | {_rec(s, 'sit2')} |")
         obs = [(v["nombre"], " ".join(str(v["observaciones"]).split())) for v in cat.variables
                if v["bloque"] == b and v.get("observaciones")]
         if obs:

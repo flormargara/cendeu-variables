@@ -63,7 +63,12 @@ cendeu variables-v2 data/v2/base data/v2/variables_m30 --pct-muestra 30 --obs 20
 
 # Informe de poder (muestra del 10%) y valor incremental contra el scorecard v1
 cendeu poder data/v2/variables --vars-v1 data/vars_cendeu_202509.parquet
-cendeu pagina-poder          # CSV de la página del informe
+cendeu pagina-poder          # CSV de la página del informe (actualiza antes los sentidos esperados con el catálogo)
+
+# Poder dentro de cada segmento y selección recomendada (total, sit1 y sit2) en catalogo/seleccion.csv
+cendeu poder data/v2/variables --segmento sit1 --pct-muestra 10 --salida reportes/poder_v2_sit1
+cendeu poder data/v2/variables --segmento sit2 --pct-muestra 30 --salida reportes/poder_v2_sit2
+cendeu seleccion
 
 # Validación multivariada: ajuste por segmento, fuera de muestra y comparación con las variables v1
 cendeu validar-v2 data/v2/variables --vars-v1 202509=data/vars_cendeu_202509.parquet 202603=data/vars_cendeu_202603_d6.parquet
