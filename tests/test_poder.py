@@ -155,3 +155,20 @@ def test_seleccion(informe, tmp_path):
     assert not s.loc["CEN_VAL_DERIVA_1M", "recomendada"]
     assert not s.loc["CEN_VAL_RUIDO_1M", "recomendada"] and "IV" in s.loc["CEN_VAL_RUIDO_1M", "motivo_no"]
     assert (s.motivo_no.fillna("") == "").eq(s.recomendada).all()
+
+
+def test_seleccion_por_segmento(informe, tmp_path):
+    _, out = informe
+    seg = tmp_path / "seg"
+    seg.mkdir()
+    r = pd.read_csv(out / "resumen.csv")
+    r[r.variable != "CEN_VAL_RUIDO_1M"].to_csv(seg / "resumen.csv", index=False)   # constante en el segmento
+    s = poder.seleccion(out, tmp_path / "s.csv", {"sitx": seg}).set_index("variable")
+    assert (s.recomendada == s.recomendada_sitx).all()
+    assert s.loc["CEN_VAL_RUIDO_1M", "motivo_no_sitx"] == "sin variación en el segmento"
+    assert not s.loc["CEN_VAL_RUIDO_1M", "recomendada_sitx"]
+
+
+def test_segmento_desconocido(tmp_path):
+    with pytest.raises(ValueError, match="segmento desconocido"):
+        poder.informe(tmp_path, tmp_path / "cat.yaml", tmp_path / "out", segmento="sit9")

@@ -64,9 +64,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--pct-muestra", type=int, default=10)
     p.add_argument("--vars-v1", help="Parquet de variables v1 para el valor incremental")
     p.add_argument("--modelo-v1", default="modelos/scorecard_cendeu_202509.json"); p.add_argument("--obs-v1", type=int, default=202509)
+    p.add_argument("--segmento", choices=["sit1", "sit2"], help="sólo situación 1 o 2 en el mes de observación")
 
     p = sub.add_parser("seleccion", help="v2: marca las variables recomendadas (IV, PSI, grupo) en catalogo/seleccion.csv")
     p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--salida", default="catalogo/seleccion.csv")
+    p.add_argument("--segmentos", nargs="*", default=["sit1=reportes/poder_v2_sit1", "sit2=reportes/poder_v2_sit2"],
+                   help="NOMBRE=informe de poder del segmento (se omiten los que no existen)")
 
     p = sub.add_parser("pagina-poder", help="v2: arma los CSV de la página del informe de poder")
     p.add_argument("--reporte", default="reportes/poder_v2"); p.add_argument("--catalogo", default="catalogo/variables.yaml")
@@ -117,14 +120,20 @@ def main(argv: list[str] | None = None) -> None:
     elif a.cmd == "poder":
         from . import poder
         r = poder.informe(a.dir_variables, a.catalogo, a.salida, fechas_oot=a.oot, pct_muestra=a.pct_muestra,
-                          vars_v1=a.vars_v1, modelo_v1=a.modelo_v1 if a.vars_v1 else None, obs_v1=a.obs_v1, memory_limit=a.memoria)
+                          vars_v1=a.vars_v1, modelo_v1=a.modelo_v1 if a.vars_v1 else None, obs_v1=a.obs_v1, memory_limit=a.memoria,
+                          segmento=a.segmento)
         print(r.head(25).to_string(index=False))
     elif a.cmd == "seleccion":
         from . import poder
-        s = poder.seleccion(a.reporte, a.salida)
+        from pathlib import Path
+        segs = {n: d for n, d in (x.split("=", 1) for x in a.segmentos) if (Path(d) / "resumen.csv").exists()}
+        s = poder.seleccion(a.reporte, a.salida, segs)
         print(f"{int(s.recomendada.sum())} recomendadas de {len(s)} evaluadas -> {a.salida}")
+        for n in segs:
+            print(f"  {n}: {int(s[f'recomendada_{n}'].sum())} recomendadas")
     elif a.cmd == "pagina-poder":
         from . import poder
+        print(f"{poder.actualizar_sentidos(a.reporte, a.catalogo)} variables con sentido esperado actualizado")
         for r in poder.archivos_pagina(a.reporte, a.catalogo, a.salida):
             print(r)
     elif a.cmd == "validar-v2":
