@@ -95,6 +95,17 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--simular-s3", action="store_true", help="no sube nada: sólo muestra qué subiría")
     p.add_argument("--perfil", default="fmargara")
 
+    p = sub.add_parser("revisar", help="revisión programada: si llegó el corte completo, corre actualizar y avisa")
+    p.add_argument("--datos", default="~/cendeu/datos"); p.add_argument("--entrada", default="~/cendeu/entrada")
+    p.add_argument("--simular-s3", action="store_true"); p.add_argument("--perfil", default="fmargara")
+
+    p = sub.add_parser("programar", help="instala en launchd la revisión diaria (cendeu revisar)")
+    p.add_argument("--datos", default="~/cendeu/datos"); p.add_argument("--entrada", default="~/cendeu/entrada")
+    p.add_argument("--hora", type=int, default=9); p.add_argument("--minuto", type=int, default=0)
+    p.add_argument("--quitar", action="store_true", help="desinstala la tarea")
+    p.add_argument("--ahora", action="store_true", help="dispara la tarea instalada sin esperar a la hora")
+    p.add_argument("--estado", action="store_true", help="muestra la tarea instalada y el final del log")
+
     p = sub.add_parser("subir", help="sube un directorio a s3://data-cendeu-raw/<prefijo> verificando tamaños")
     p.add_argument("dir_local"); p.add_argument("prefijo", help="p. ej. variables o deudores")
     p.add_argument("--perfil", default="fmargara")
@@ -166,6 +177,31 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(0 if d["completo"] else 1)
         actualizar.actualizar(corte, a.entrada, a.datos, recalcular=a.recalcular, hasta=a.hasta, rehacer=a.rehacer,
                               forzar=a.forzar, simular_s3=a.simular_s3, perfil=a.perfil, memoria=a.memoria)
+    elif a.cmd == "revisar":
+        from . import revisar
+        r = revisar.revisar(a.datos, a.entrada, simular_s3=a.simular_s3, perfil=a.perfil, memoria=a.memoria)
+        raise SystemExit(0 if r in ("ocupado", "esperando", "incompleto", "actualizado") else 1)
+    elif a.cmd == "programar":
+        from pathlib import Path
+        from . import revisar
+        if a.quitar:
+            print("tarea quitada" if revisar.quitar() else "no había tarea instalada")
+        elif a.ahora:
+            revisar.correr_ahora()
+            print(f"disparada; log en {Path(a.datos).expanduser() / '_actualizaciones' / 'revisar.log'}")
+        elif a.estado:
+            pl = revisar.instalada()
+            if not pl:
+                print("no hay tarea instalada")
+            else:
+                h = pl["StartCalendarInterval"]
+                print(f"instalada: todos los días a las {h['Hour']:02d}:{h['Minute']:02d}; {' '.join(pl['ProgramArguments'][2:])}")
+                log = Path(a.datos).expanduser() / "_actualizaciones" / "revisar.log"
+                if log.exists():
+                    print("".join(log.read_text(encoding="utf-8").splitlines(keepends=True)[-10:]), end="")
+        else:
+            ruta = revisar.programar(Path.cwd(), a.datos, a.entrada, a.hora, a.minuto, a.memoria)
+            print(f"instalada en {ruta}: todos los días a las {a.hora:02d}:{a.minuto:02d} (si la Mac duerme, al despertar)")
     elif a.cmd == "subir":
         filas = s3.subir(a.dir_local, a.prefijo, a.perfil, renombrar=dict(r.split("=", 1) for r in a.renombrar), simular=a.simular)
         malos = [f for f in filas if f["estado"] not in ("ok", "simulado")]

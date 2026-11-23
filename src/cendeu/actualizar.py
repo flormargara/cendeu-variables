@@ -45,6 +45,16 @@ TOL_MES_NUEVO_ALERTA, TOL_MES_NUEVO_ERROR = 0.05, 0.20  # mes nuevo contra el an
 PSI_ALERTA = 0.1
 
 
+class ControlesConError(SystemExit):
+    """Algún control dio error: no se promueve nada."""
+
+    def __init__(self, resultado: dict):
+        self.resultado = resultado
+        errores = [f"{f['control']}: {f['detalle']}" for f in resultado["filas"] if f["nivel"] == "error"]
+        super().__init__(f"{len(errores)} controles con error, no se promueve nada:\n  " + "\n  ".join(errores) +
+                         "\nCorregir y volver a correr (retoma en controles), o usar --forzar.")
+
+
 def _ahora() -> str:
     return dt.datetime.now().isoformat(timespec="seconds")
 
@@ -410,10 +420,14 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
                           est.info("convertir").get("control_24dsf"), ref, ref / "ipc.csv", memoria)
             for f in r["filas"]:
                 print(f"  {f['nivel']:>6}  {f['control']}: {f['detalle']}", flush=True)
-            est.guardar(paso, **r, segundos=round(time.time() - t0))
             if r["errores"] and not forzar:
-                raise SystemExit(f"{r['errores']} controles con error: no se promueve nada. Revisar, corregir y correr "
-                                 f"de nuevo con --rehacer controles (o --forzar).")
+                # no se marca como hecho: la próxima corrida vuelve a controlar (por ejemplo, después de corregir
+                # una referencia); el resultado queda aparte para el aviso
+                est.datos["controles_fallidos"] = {**r, "fecha": _ahora()}
+                est.ruta.write_text(json.dumps(est.datos, indent=2, ensure_ascii=False, default=str))
+                raise ControlesConError(r)
+            est.datos.pop("controles_fallidos", None)
+            est.guardar(paso, **r, segundos=round(time.time() - t0))
 
         elif paso == "promover" and correr(paso):
             viejos = trabajo / "reemplazados"
