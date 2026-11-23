@@ -73,6 +73,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 - **Fotos del corte**: el 1DSF y el padrón son fotos de hoy. El 1DSF filtraba el desempeño (IV 7,5 falso), por eso las variables tienen `disponible_desde` y quedan nulas en fechas anteriores a su fuente. Actividad y provincia del padrón no mostraron señales de fuga (PSI ≈ 0), pero siguen siendo fotos.
 - **Borde de la historia**: las variables que necesitan el mes previo a su ventana (`requiere_mes_previo`) quedan nulas cuando ese mes no está en el 24DSF (202509 para ventanas de 12 meses).
 - **Memoria**: la base se escribe bucket por bucket y las variables por partes de ~1,3 M de CUITs con 10 GB; con menos memoria fallan pasos que DuckDB no vuelca a disco. Para iterar en desarrollo está el modo muestra (`variables-v2 --pct-muestra 30`, ver README) y la población completa queda para la corrida que se sube a S3.
+- **Fechas que arma cada corte** (decidido el 2026-11-23): cada corte sólo arma las fechas nuevas; `--recalcular` (~1,5 h más) se usa a mano, por ejemplo antes de reentrenar un modelo, para que las fechas viejas no cambien solas. Corregido el mismo día: la fecha corte − 6 se rehace siempre, aunque exista, para que la foto armada seis cortes atrás reciba su target (antes quedaba sin target para siempre).
 - **Reproducibilidad**: los montos tienen ruido de punto flotante entre corridas (sumas en paralelo, ≤ 1e-7); los enteros y categóricas son idénticos.
 
 ## Pendientes
@@ -80,7 +81,6 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
 - Corte 202610: bajar los seis paquetes de ARCA a `~/cendeu/entrada` cuando estén (el de 202609 se procesó el 2026-11-05, así que se espera a principios de diciembre); la revisión diaria hace el resto.
 - Actualización mensual, etapa 3 (opcional): correrla en AWS con el rol `data-cendeu`, disparada al llegar los paquetes a `s3://data-cendeu-raw/entrada/AAAAMM/`.
-- Decidir si cada corte recalcula las fechas anteriores (`--recalcular`, ~1,5 h más) o sólo agrega las nuevas (default). Corregido el 2026-11-23: la fecha corte − 6 se rehace siempre, aunque exista, para que la foto armada seis cortes atrás reciba su target (antes quedaba sin target para siempre).
 
 ## Bloques de variables (Fase 2)
 
