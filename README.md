@@ -21,11 +21,11 @@ Requiere Python ≥ 3.10. Para descomprimir los archivos del BCRA hace falta `7z
 | Carpeta | Contenido |
 |---|---|
 | [`catalogo/variables.yaml`](catalogo/variables.yaml) | Fuente única de las variables v2: nombre, definición, fuente, nulos, uso y expresión SQL de cada una |
-| [`src/cendeu/`](src/cendeu/) | Paquete: `v2.py` (base y variables), `catalogo.py` (carga, validación y documentación), `poder.py` (informe de poder), `validacion_v2.py` (validación multivariada), `s3.py` (subida), `pipeline.py`, `scorecard.py` y `scoring.py` (v1) |
+| [`src/cendeu/`](src/cendeu/) | Paquete: `v2.py` (base y variables), `actualizar.py` (corte mensual), `paquete.py` (conversor del paquete mensual), `catalogo.py` (carga, validación y documentación), `poder.py` (informe de poder), `validacion_v2.py` (validación multivariada), `s3.py` (subida), `pipeline.py`, `scorecard.py` y `scoring.py` (v1) |
 | [`referencias/`](referencias/) | Datos públicos versionados: IPC INDEC, tipo de entidad, fideicomisos de recupero y equivalencias por fusiones |
 | [`docs/`](docs/) | Documento técnico y diccionario de variables (generados desde el catálogo) y el informe de variables mix |
 | [`reportes/`](reportes/) | Estudio del 24DSF, fuentes BCRA y ARCA, informe de poder v2 y su página, validación multivariada |
-| [`estudios/`](estudios/) | Scripts de estudio y el conversor de los paquetes mensuales |
+| [`estudios/`](estudios/) | Scripts de estudio |
 | [`modelos/`](modelos/) | Scorecard v1 (línea de base para comparar) |
 | [`infra/`](infra/) | Política IAM del bucket |
 
@@ -40,7 +40,7 @@ En ARCA con clave fiscal → *BCRA – Cheques y Deudores* → *Deudores* (acept
 ```bash
 7z x 24DSF202609.7Z -odata/24DSF202609
 cendeu convertir data/24DSF202609/24DSF.txt data/deudores_24m --corte 202609 --control data/24DSF202609/24DSF_control.txt
-python estudios/convertir_paquete_mensual.py ~/Downloads data --periodo 202609 --padron 20261030
+python -m cendeu.paquete ~/Downloads data --periodo 202609 --padron 20261030
 ```
 
 El conversor del paquete mensual valida el largo de cada registro contra su LEAME antes de convertir.
@@ -89,6 +89,35 @@ Tiempos de referencia (M-series, 10 núcleos, 16 GB, `--memoria 10GB`): base ~6 
 **Modo muestra** (`variables-v2 --pct-muestra N`): para iterar sobre el catálogo sin recalcular toda la población. Toma los CUITs con `hash(CUIT) % 100 < N`, el mismo criterio de `poder` (10%) y `validar-v2` (3% en situación 1, 30% en situación 2), así que sus muestras quedan contenidas en la de las variables y los valores son idénticos a los de la población completa para esos CUITs. Con 30% alcanza para todos los informes. Cada fecha guarda la muestra en `_muestra.json`; no se mezclan porcentajes en una carpeta, `poder` y `validar-v2` fallan si se les pide más porcentaje del que hay, y `cendeu subir` rechaza las muestras (a S3 va sólo la población completa).
 
 Cada base guarda en `_meta.json` el hash del IPC y de las referencias que usó, y si algún mes del IPC estaba imputado.
+
+### 4. Actualización mensual (`cendeu actualizar`)
+
+Con cada corte nuevo, lo único manual es bajar de ARCA los seis paquetes del punto 1 (comprimidos o descomprimidos) a una carpeta de entrada. El resto lo hace un comando:
+
+```bash
+# ¿Llegó el corte? (sale con 1 si falta algún paquete; el corte por defecto es el mes siguiente al último cargado)
+cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads --detectar
+
+# Hasta los controles, para revisar antes de tocar nada
+cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads --hasta controles
+
+# Todo: promueve, arma base y variables, mide PSI, sube a S3 y escribe reportes/actualizaciones/AAAAMM.md
+cendeu actualizar --datos ~/Downloads/cendeu_parquet --entrada ~/Downloads
+```
+
+| Paso | Qué hace |
+|---|---|
+| `convertir` | 24DSF a Parquet y control contra `24DSF_control.txt`; paquete mensual y padrón a Parquet (descomprime con `7z` si hace falta) |
+| `ipc` | Actualiza `referencias/ipc.csv` desde la API del INDEC; los meses sin publicar quedan imputados |
+| `controles` | Totales del BCRA, 24 meses completos, rectificaciones en los meses solapados, mes nuevo contra el anterior, entidades sin tipo, IPC. Con un error frena antes de tocar los datos |
+| `promover` | Reemplaza los meses del corte anterior (los viejos quedan en `_actualizaciones/AAAAMM/reemplazados`) |
+| `base` | Base v2 nueva con el mismo mes base de IPC; el mensual reemplaza al 24DSF sólo en el mes de corte |
+| `variables` | Fechas nuevas: el corte (foto actual, sin target) y corte − 6 (primera con desempeño completo). `--recalcular` rehace también las anteriores con la historia rectificada |
+| `monitoreo` | PSI de cada variable de las fechas nuevas contra la última fecha que ya existía |
+| `subir` | S3 y registro en `_control/` (`--simular-s3` para ver qué subiría) |
+| `resumen` | `reportes/actualizaciones/AAAAMM.md` |
+
+Todo lo nuevo se arma en `<datos>/_actualizaciones/AAAAMM/` y se mueve a su lugar después de los controles. El estado de cada paso queda en `estado.json`: si una corrida se corta, la siguiente retoma desde el primer paso pendiente; `--rehacer PASO` vuelve a correr desde ese paso. Si un control da error (por ejemplo, una entidad nueva sin tipo), se corrige la referencia y se corre `--rehacer controles`.
 
 ### Salidas
 
