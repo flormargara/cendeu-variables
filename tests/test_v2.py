@@ -19,6 +19,29 @@ B = 27000000029   # entidad 150 hasta 202505 y 7 desde 202506 (fusión: no debe 
 C = 20300000001   # presente, ausente 4 meses, vuelve (huecos, reactivación)
 D = 20400000002   # fallecido en 202512
 E_VIEJO, E_NUEVO = 20111111112, 20222222223  # CUIT dado de baja y su reemplazo
+EMP1, EMP2 = 30999999992, 30888888885       # personas jurídicas vinculadas a B (cheques)
+FOTO_CHQ = 20261015                         # foto de cheques: 15 días después del fin de 202609
+
+
+def _cheques():
+    """Foto sintética de la Central de Cheques Rechazados (montos en pesos)."""
+    f = lambda cuit, fecha, monto, causal=2, lev=None, rel=None, multa="IMPAGA", nro=1: dict(
+        cuit=cuit, nro_cheque=nro, fecha_rechazo=pd.Timestamp(fecha).date(), monto=monto, causal=causal,
+        fecha_levantamiento=pd.Timestamp(lev).date() if lev else None, revision="S", judicial="F",
+        cuit_relacionado=rel, pago_multa=multa)
+    return pd.DataFrame([
+        f(A, "2026-09-10", 1000.0, nro=1),                                        # impago
+        f(A, "2026-05-20", 2000.0, lev="2026-06-15", multa="20/06/2026", nro=2),  # levantado antes del fin de mes
+        f(A, "2026-09-20", 3000.0, lev="2026-10-05", multa="06/10/2026", nro=3),  # levantado después: impago a t
+        f(A, "2026-10-05", 9000.0, nro=4),                                        # rechazado después de t
+        f(A, "2026-01-10", 500.0, causal=1, multa="SUSPENDIDO", nro=5),           # vicios formales
+        f(A, "2022-03-01", 4000.0, nro=6),                                        # viejo, impago
+        f(B, "2026-08-01", 700.0, rel=EMP1, nro=7),                               # cheque de una empresa vinculada
+        f(20500000003, "2026-08-01", 700.0, rel=EMP1, nro=7),                     # el mismo, en otra persona vinculada
+        f(B, "2025-01-01", 800.0, rel=EMP2, nro=8),                               # empresa vinculada, fuera de 12 meses
+        f(EMP1, "2026-08-01", 700.0, nro=7),                                      # la empresa (no está en la central)
+        f(E_VIEJO, "2026-07-01", 100.0, nro=9),                                   # CUIT reemplazado
+    ])
 
 
 def _filas():
@@ -67,10 +90,16 @@ def entorno(tmp_path_factory):
         t(cuit, actividad, baja, cuit_reemplazo, fecha_nac_contrato, sexo, provincia, fecha_fallecimiento))
         TO '{tmp}/padron.parquet'""")
     con.execute(f"COPY (SELECT 11 tipo_id, {B}::BIGINT cuit, 201001 desde_sit1) TO '{tmp}/1dsf.parquet'")
+    chq = _cheques()
+    (tmp / "chq" / f"corte={FOTO_CHQ}").mkdir(parents=True)
+    con.execute(f"""COPY (SELECT cuit::BIGINT cuit, nro_cheque::BIGINT nro_cheque, fecha_rechazo::DATE fecha_rechazo,
+                   monto::DECIMAL(15,2) monto, causal::BIGINT causal, fecha_levantamiento::DATE fecha_levantamiento, revision,
+                   judicial, cuit_relacionado::BIGINT cuit_relacionado, pago_multa FROM chq)
+                   TO '{tmp}/chq/corte={FOTO_CHQ}/data.parquet'""")
 
     base = v2.construir_base(tmp / "d24", tmp / "base", tmp / "ipc.csv", RAIZ / "referencias",
                              mensual=tmp / "men", padron=tmp / "padron.parquet", uno_dsf=tmp / "1dsf.parquet",
-                             n_buckets=2, memory_limit="1GB")
+                             cheques=tmp / "chq", n_buckets=2, memory_limit="1GB")
     return base, RAIZ / "catalogo" / "variables.yaml", tmp
 
 
@@ -216,3 +245,54 @@ def test_decimales_y_precision_simple(resultado):
     assert all(str(r[n].dtype) == "float32" for n in decimales)
     # el valor guardado es el redondeo (salvo el error de representación de float32)
     assert float(r.loc[A, "CEN_RAT_CURA_12M"]) == pytest.approx(0.3333, abs=1e-7)
+
+
+def test_fotos_cheques_por_periodo():
+    assert v2.fotos_cheques([20261031, 20261203], [202609, 202610, 202611, 202612]) == \
+        {202609: 20261031, 202610: 20261031, 202611: 20261203}
+    assert v2.fotos_cheques([20261120], [202609]) == {}            # 51 días después: fuera de la tolerancia
+    assert v2.fotos_cheques([20260929], [202609]) == {}            # anterior al fin de mes: no cubre el mes
+
+
+@pytest.fixture(scope="module")
+def cheques(entorno):
+    """Variables a 202609 con la foto de cheques sintética. El catálogo real las habilita desde 202610 (primera foto
+    real); acá se usa una copia que las habilita desde 202609, el mes que cubre la foto sintética."""
+    base, cat, tmp = entorno
+    cat_chq = tmp / "variables_chq.yaml"
+    cat_chq.write_text(cat.read_text(encoding="utf-8").replace("disponible_desde: 202610", "disponible_desde: 202609"),
+                       encoding="utf-8")
+    out = v2.construir_variables(base, 202609, tmp / "vars_chq", cat_chq, n_buckets=2, memory_limit="1GB")
+    return duckdb.connect().execute(f"SELECT * FROM read_parquet('{out}/*.parquet')").df().set_index("CUIT")
+
+
+def test_cheques_propios_al_fin_de_mes(cheques):
+    a = cheques.loc[A]
+    assert (a.CEN_CNT_CHQ_RECH_SF_3M, a.CEN_CNT_CHQ_RECH_SF_6M, a.CEN_CNT_CHQ_RECH_SF_12M) == (2, 3, 3)
+    assert a.CEN_SUM_CHQ_RECH_SF_3M == pytest.approx(4.0) and a.CEN_SUM_CHQ_RECH_SF_12M == pytest.approx(6.0)
+    assert a.CEN_CNT_CHQ_RECH_VF_12M == 1
+    assert a.CEN_CNT_CHQ_IMPAGOS_1M == 3                       # el levantado después del fin de mes sigue impago
+    assert a.CEN_MTO_CHQ_IMPAGOS_1M == pytest.approx(8.0)
+    assert a.CEN_PCT_CHQ_LEVANTADOS_12M == pytest.approx(1 / 3, abs=1e-4)
+    assert a.CEN_RCM_CHQ_RECH_SF_12M == 0 and a.CEN_FLG_CHQ_MULTA_IMPAGA_1M == 1
+    assert a.CEN_RAT_CHQ_RECH_DEUDA_12M == pytest.approx(6.0 / 150, abs=1e-4)
+    assert a.CEN_CNT_CHQ_REL_RECH_SF_12M == 0
+
+
+def test_cheques_vinculados_reemplazo_y_ceros(cheques):
+    b = cheques.loc[B]
+    assert b.CEN_CNT_CHQ_RECH_SF_12M == 0 and b.CEN_CNT_CHQ_IMPAGOS_1M == 0
+    assert b.CEN_CNT_CHQ_REL_RECH_SF_12M == 1 and b.CEN_CNT_EMP_REL_CHQ_12M == 1 and b.CEN_CNT_CHQ_REL_IMPAGOS_1M == 2
+    assert cheques.loc[E_NUEVO, "CEN_CNT_CHQ_RECH_SF_3M"] == 1     # el cheque del CUIT dado de baja pasa al reemplazo
+    c = cheques.loc[C]                                              # sin cheques en la foto: 0, no nulo
+    assert c.CEN_CNT_CHQ_RECH_SF_12M == 0 and c.CEN_FLG_CHQ_MULTA_IMPAGA_1M == 0
+    assert pd.isna(c.CEN_PCT_CHQ_LEVANTADOS_12M) and pd.isna(c.CEN_RCM_CHQ_RECH_SF_12M)
+
+
+def test_cheques_nulos_sin_foto_o_antes_de_disponible(resultado):
+    r, r9, _ = resultado
+    chq = [c for c in r.columns if "_CHQ_" in c]
+    assert len(chq) == 16
+    assert r[chq].isna().all().all()     # 202603: sin foto de cheques
+    assert r9[chq].isna().all().all()    # 202609 con el catálogo real: disponible desde 202610
+

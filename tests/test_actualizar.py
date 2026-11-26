@@ -21,12 +21,19 @@ def test_detectar_y_proximo_corte(tmp_path):
     for n in ["24DSF202610.7Z", "202610DEUDORES", "1dsf202610.zip", "202610INFRET", "20261030PADRON.7Z"]:
         (e / n).mkdir() if "." not in n else (e / n).write_bytes(b"x")
     d = act.detectar(e, CORTE)
-    assert not d["completo"] and d["faltan"] == ["202610INFRETPA", "AAAAMMDDPADRON posterior a 202610"]
+    assert not d["completo"] and d["faltan"] == [
+        "202610INFRETPA", "AAAAMMDDPADRON posterior a 202610",
+        "AAAAMMDDCHEQUES desde el fin de 202610 hasta 45 días después"]
     (e / "202610INFRETPA").mkdir()
     (e / "20261201PADRON").mkdir()
     (e / "20261201PADRON.7Z").write_bytes(b"x")
+    (e / "20261030CHEQUES.7z").write_bytes(b"x")     # anterior al fin del mes de corte: no sirve
+    (e / "20261231CHEQUES.7z").write_bytes(b"x")     # más de 45 días después
+    assert not act.detectar(e, CORTE)["completo"]
+    (e / "20261203CHEQUES.7z").write_bytes(b"x")
+    (e / "20261031CHEQUES.7z").write_bytes(b"x")     # la más cercana al fin de mes
     d = act.detectar(e, CORTE)
-    assert d["completo"] and d["padron"] == 20261201
+    assert d["completo"] and d["padron"] == 20261201 and d["cheques"] == 20261031
     assert d["encontrados"]["padron"].endswith("20261201PADRON")   # la carpeta antes que el comprimido
     assert d["encontrados"]["1dsf"].endswith("1dsf202610.zip")
     datos = tmp_path / "datos"

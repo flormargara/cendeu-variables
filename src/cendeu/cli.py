@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("dir_24dsf"); p.add_argument("salida")
     p.add_argument("--ipc", default="referencias/ipc.csv"); p.add_argument("--referencias", default="referencias")
     p.add_argument("--mensual"); p.add_argument("--padron"); p.add_argument("--uno-dsf")
+    p.add_argument("--cheques", help="carpeta con corte=AAAAMMDD/data.parquet (fotos de cheques rechazados)")
     p.add_argument("--base-ipc", type=int, help="período de los pesos constantes (default: último del IPC)")
     p.add_argument("--desde", type=int, help="retomar desde este período (los anteriores ya están escritos)")
 
@@ -128,7 +129,7 @@ def main(argv: list[str] | None = None) -> None:
         scorecard.entrenar(a.variables, a.modelo_json, pct_muestra=a.pct_muestra, max_vars=a.max_vars)
     elif a.cmd == "base":
         v2.construir_base(a.dir_24dsf, a.salida, a.ipc, a.referencias, mensual=a.mensual, padron=a.padron,
-                          uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, desde=a.desde, **kw)
+                          uno_dsf=a.uno_dsf, base_ipc=a.base_ipc, desde=a.desde, cheques=a.cheques, **kw)
     elif a.cmd == "variables-v2":
         for obs in a.obs:
             v2.construir_variables(a.dir_base, obs, a.salida, a.catalogo, buckets=a.buckets, retomar=a.retomar,

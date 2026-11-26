@@ -17,6 +17,7 @@ Complemento de la Fase 1 ([estudio del 24DSF](estudio_24dsf.md)). Revisa los paq
 | 202609INFRETPA | `inf_retparc.txt` | 1,87 M | 93 ✓ | Rectificativas parciales (históricas, 2001–2026) | Control de reproceso |
 | 20261030PADRON | `Padron_ARCA.txt` | 65,5 M | 220 ✓ | Padrón ARCA: actividad, nacimiento/contrato social, sexo, CP, provincia, fallecimiento, bajas | Atributos de la persona |
 | 20261030PADRON | `Actividades_ARCA.txt` | 2.327 | **266** (LEAME dice 260) | Nomenclador de actividades | Descripción de actividad |
+| 20261031CHEQUES | `cheques.txt` | 3,78 M | 81 ✓ | Central de Cheques Rechazados: foto completa al día de la descarga | Bloque B11 (cheques propios y de empresas vinculadas) |
 
 Notas de formato: todos los archivos vienen en latin-1 con fin de línea CRLF. `inf_retparc.txt` y `Padron_ARCA.txt` traen algunos bytes de control dentro de los nombres; el conversor los reemplaza (los nombres no se guardan). En `Actividades_ARCA.txt` la descripción mide 260 y no 254 como dice el LEAME.
 
@@ -117,6 +118,25 @@ Irregularidad **actual** (situación ≥3 en 202609, no es el target) por atribu
 - **Código postal y provincia**: variables geográficas candidatas (a nivel provincia o agregado de CP, nunca dirección).
 - **Limitación**: el padrón es una foto (20261030). La edad se recalcula a cada fecha de observación sin problema, pero actividad, baja y fallecimiento son de hoy: para fechas pasadas pueden filtrar información del futuro. Fallecimiento sí se puede usar con su fecha.
 
+## 7. Central de Cheques Rechazados
+
+Se baja del mismo servicio de ARCA (*BCRA – Cheques y Deudores* → *Cheques*). A diferencia de los paquetes de deudores, no es un período sino una **foto** de la central el día de la descarga (`AAAAMMDDCHEQUES`); la primera es la del 20261031. Diseño de registro: `LEAME CHEQUES.pdf` (10 campos, 81 caracteres; monto con dos decimales implícitos, fechas AAAAMMDD).
+
+| | Foto 20261031 |
+|---|---|
+| Filas | 3.784.139 (2.353.876 cheques distintos) |
+| CUITs | 220.829 (178.717 en la central de 202609) |
+| Rechazos | 2022-01-03 a 2026-10-30; 98,7% sin fondos, 1,3% por vicios formales |
+| Levantados | 595.306 filas con fecha de levantamiento, siempre posterior al rechazo |
+| Multa | 51% pagada (con fecha), 49% impaga, 0,4% suspendida (Ley 24.452) |
+| Revisión / proceso judicial | casi todo en "fin de revisión" y "fin de proceso judicial" (96 filas en curso) |
+| Filas de personas vinculadas | 1,38 M: el cheque de una persona jurídica repetido en cada persona relacionada (65.812 CUITs, 54.915 empresas) |
+| En la central con rechazo sin fondos en 12 meses | 71.385 CUITs (0,3% de la central) |
+
+- **Sesgo de supervivencia**: entre los rechazos de 2022 figura levantado el 1,6%; entre los de 2026, cerca del 24%. El BCRA da de baja los cheques levantados después de un tiempo, así que una foto no permite reconstruir el estado de la central en fechas pasadas: lo que sobrevive de un año viejo son sobre todo los impagos. Por eso cada foto se usa sólo para el mes que cubre.
+- **Reconstrucción al fin de mes**: dentro de una foto sí se puede volver unos días atrás con las fechas de rechazo, levantamiento y pago de multa. Cada mes usa la foto más cercana tomada entre su último día y 45 días después (`v2.fotos_cheques`); lo único que no se recupera son los cheques dados de baja en ese lapso.
+- **Historia**: sólo hay una foto. Hay que bajar una por mes (idealmente el último día del mes, o junto con el corte de deudores); las variables quedan con `uso: futuro` hasta que haya target para medir su poder (primera fecha 202610, con desempeño completo en el corte 202704).
+
 ## Decisiones
 
 1. **Ingesta mensual**: período de corte desde `deudores.txt` + 23 meses desde el 24DSF; guardar mensual completo, maestro de entidades, 1DSF y rectificativas por período en S3.
@@ -126,3 +146,4 @@ Irregularidad **actual** (situación ≥3 en 202609, no es el target) por atribu
 5. **Acumular mensuales** desde ahora para que esos campos tengan historia en iteraciones futuras.
 6. **Variables de persona (padrón)**: edad o antigüedad de la empresa, actividad registrada y su rubro, provincia. Fallecidos fuera de la población. Sexo sólo para monitorear sesgos.
 7. **Unificar CUITs dados de baja** con su CUIT de reemplazo antes de construir variables.
+8. **Cheques rechazados** (agregado el 2026-11-25): una foto por mes como séptimo paquete del corte; variables del bloque B11 desde 202610, nulas en los meses sin foto.

@@ -55,6 +55,7 @@ observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deud
 | `1DSF` | Fecha desde la cual el deudor está en situación 1 en todas las entidades (sin tope de 24 meses) |
 | `MAEENT` | Maestro de entidades del BCRA + referencias/entidades.csv |
 | `PADRON` | Padrón de ARCA (foto, corte 20261030) |
+| `CHEQUES` | Central de Cheques Rechazados del BCRA (foto completa al día de la descarga, AAAAMMDDCHEQUES; se acumula una por mes desde 20261031) |
 
 ## Series mensuales base
 
@@ -100,7 +101,7 @@ observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deud
 
 ## Resumen
 
-149 variables.
+165 variables.
 
 | Bloque | Qué mide | Variables | Uso |
 |---|---|---|---|
@@ -114,6 +115,7 @@ observación (`1M` = el mes de observación). Ejemplo: `CEN_TEN_DEUDA_6M` = deud
 | [B08_FOTO_MENSUAL](#b08_foto_mensual) | Campos que sólo trae el mensual (atraso, refinanciación, garante) | 7 | futuro: 7 |
 | [B09_PERSONA](#b09_persona) | Atributos de la persona (padrón, 1DSF) | 10 | exclusion: 1, futuro: 1, modelo: 7, monitoreo: 1 |
 | [B10_ALERTAS](#b10_alertas) | Combinaciones de señales tempranas | 6 | modelo: 6 |
+| [B11_CHEQUES](#b11_cheques) | Cheques rechazados propios y de las empresas vinculadas | 16 | futuro: 16 |
 
 `uso`: **modelo** = candidata al score; **futuro** = sólo existe desde 202609 (mensual), entra cuando haya historia acumulada; **monitoreo** = no entra al score, sirve para medir sesgos; **exclusion** = define la población.
 
@@ -398,6 +400,35 @@ Notas:
 
 Notas:
 - `CEN_FLG_ALERTA_SOBREENDEUDAMIENTO_6M`: Umbrales iniciales; se calibran con el informe de poder.
+
+<a id="b11_cheques"></a>
+## B11_CHEQUES — Cheques rechazados propios y de las empresas vinculadas
+
+| Variable | Descripción | Definición | Nulos | Sentido | Uso | IV | Rec. | S1 | S2 |
+|---|---|---|---|---|---|---|---|---|---|
+| `CEN_CNT_CHQ_RECH_SF_3M` | Cheques propios rechazados sin fondos en los últimos 3 meses | COUNT cheques propios con causal 2 y fecha de rechazo en t-2..t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_CNT_CHQ_RECH_SF_6M` | Cheques propios rechazados sin fondos en los últimos 6 meses | COUNT cheques propios con causal 2 y fecha de rechazo en t-5..t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_CNT_CHQ_RECH_SF_12M` | Cheques propios rechazados sin fondos en los últimos 12 meses | COUNT cheques propios con causal 2 y fecha de rechazo en t-11..t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_SUM_CHQ_RECH_SF_3M` | Monto de los cheques propios rechazados sin fondos en los últimos 3 meses | SUM monto de los cheques propios con causal 2 y fecha de rechazo en t-2..t, deflactado con el IPC del mes del rechazo | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_SUM_CHQ_RECH_SF_6M` | Monto de los cheques propios rechazados sin fondos en los últimos 6 meses | SUM monto de los cheques propios con causal 2 y fecha de rechazo en t-5..t, deflactado con el IPC del mes del rechazo | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_SUM_CHQ_RECH_SF_12M` | Monto de los cheques propios rechazados sin fondos en los últimos 12 meses | SUM monto de los cheques propios con causal 2 y fecha de rechazo en t-11..t, deflactado con el IPC del mes del rechazo | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_CNT_CHQ_RECH_VF_12M` | Cheques propios rechazados por vicios formales en los últimos 12 meses | COUNT cheques propios con causal 1 y fecha de rechazo en t-11..t | sin foto de cheques para el mes de observación | ? | futuro |  |  |  |  |
+| `CEN_CNT_CHQ_IMPAGOS_1M` | Cheques propios rechazados sin fondos que siguen sin levantar a la fecha de observación | COUNT cheques propios con causal 2, rechazados hasta t y sin fecha de levantamiento hasta el último día de t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_MTO_CHQ_IMPAGOS_1M` | Monto de los cheques propios rechazados sin fondos sin levantar a la fecha de observación | SUM monto de los cheques de CEN_CNT_CHQ_IMPAGOS_1M, deflactado con el IPC del mes del rechazo | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_PCT_CHQ_LEVANTADOS_12M` | Proporción de los cheques propios rechazados sin fondos en los últimos 12 meses que ya se levantaron | cheques con causal 2 rechazados en t-11..t y levantados hasta el último día de t / cheques con causal 2 rechazados en t-11..t | sin rechazos sin fondos en los últimos 12 meses o sin foto de cheques | - | futuro |  |  |  |  |
+| `CEN_RCM_CHQ_RECH_SF_12M` | Meses desde el último rechazo sin fondos de un cheque propio en los últimos 12 meses | t - mes del último rechazo con causal 2 en t-11..t | sin rechazos sin fondos en los últimos 12 meses o sin foto de cheques | - | futuro |  |  |  |  |
+| `CEN_FLG_CHQ_MULTA_IMPAGA_1M` | Tiene algún cheque propio rechazado sin fondos con la multa impaga a la fecha de observación | algún cheque propio con causal 2 y pago de multa IMPAGA o pagada después del último día de t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_RAT_CHQ_RECH_DEUDA_12M` | Monto rechazado sin fondos en los últimos 12 meses sobre la deuda en el sistema | CEN_SUM_CHQ_RECH_SF_12M / CEN_MTO_DEUDA_1M | deuda 0 o sin foto de cheques | + | futuro |  |  |  |  |
+| `CEN_CNT_CHQ_REL_RECH_SF_12M` | Cheques rechazados sin fondos en los últimos 12 meses de las personas jurídicas vinculadas | COUNT cheques con causal 2 y fecha de rechazo en t-11..t informados con el CUIT en una persona jurídica relacionada | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_CNT_EMP_REL_CHQ_12M` | Personas jurídicas vinculadas con cheques rechazados sin fondos en los últimos 12 meses | COUNT DISTINCT CUIT relacionado con algún cheque con causal 2 en t-11..t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+| `CEN_CNT_CHQ_REL_IMPAGOS_1M` | Cheques sin fondos sin levantar de las personas jurídicas vinculadas a la fecha de observación | COUNT cheques con causal 2 de personas jurídicas relacionadas, sin levantar hasta el último día de t | sin foto de cheques para el mes de observación | + | futuro |  |  |  |  |
+
+Notas:
+- `CEN_CNT_CHQ_RECH_VF_12M`: Causal poco frecuente (1,3% de la foto 20261031); no indica falta de fondos.
+- `CEN_CNT_CHQ_IMPAGOS_1M`: Toda la historia de la foto (hasta 5 años); el BCRA da de baja los cheques levantados viejos, no los impagos.
+- `CEN_MTO_CHQ_IMPAGOS_1M`: Los rechazos anteriores al primer mes del IPC versionado (202409) se deflactan con ese mes, así que su monto queda subestimado.
+- `CEN_FLG_CHQ_MULTA_IMPAGA_1M`: Las multas suspendidas (Ley 24.452, art. 64) no cuentan como impagas.
+- `CEN_CNT_CHQ_REL_RECH_SF_12M`: Contagio desde las empresas en las que la persona figura como relacionada (por ejemplo, socio o directivo).
 
 ## Cómo agregar o cambiar una variable
 

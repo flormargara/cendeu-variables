@@ -1,6 +1,6 @@
 # cendeu-variables
 
-Variables de comportamiento crediticio a partir de la **Central de Deudores del Sistema Financiero (BCRA)**: el bianual `24DSF` (24 meses de historia de todos los deudores del país), el `deudores.txt` mensual, el 1DSF, el maestro de entidades y el padrón de ARCA.
+Variables de comportamiento crediticio a partir de la **Central de Deudores del Sistema Financiero (BCRA)**: el bianual `24DSF` (24 meses de historia de todos los deudores del país), el `deudores.txt` mensual, el 1DSF, el maestro de entidades, el padrón de ARCA y la **Central de Cheques Rechazados**.
 
 El repo construye, documenta y valida las variables; los modelos que las usan (por ejemplo, un modelo de PD) se desarrollan en otros proyectos. Se usa como **paquete Python** o por **CLI** (`cendeu <comando>`) en un batch mensual. Todo el procesamiento pesado corre en DuckDB. El plan, las decisiones y los pendientes están en [PLAN.md](PLAN.md).
 
@@ -33,14 +33,14 @@ Requiere Python ≥ 3.10. Para descomprimir los archivos del BCRA hace falta `7z
 
 ### 1. Descarga
 
-En ARCA con clave fiscal → *BCRA – Cheques y Deudores* → *Deudores* (aceptar la DJ de la Ley 25.326): el bianual `24DSFAAAAMM`, el mensual `AAAAMMDEUDORES`, `1DSFAAAAMM`, las rectificativas (`AAAAMMINFRET`, `AAAAMMINFRETPA`) y el padrón (`AAAAMMDDPADRON`).
+En ARCA con clave fiscal → *BCRA – Cheques y Deudores* → *Deudores* (aceptar la DJ de la Ley 25.326): el bianual `24DSFAAAAMM`, el mensual `AAAAMMDEUDORES`, `1DSFAAAAMM`, las rectificativas (`AAAAMMINFRET`, `AAAAMMINFRETPA`) y el padrón (`AAAAMMDDPADRON`). En *Cheques*, la foto de la Central de Cheques Rechazados (`AAAAMMDDCHEQUES`), que es el estado del día de la descarga: hay que bajarla todos los meses, entre el último día del mes de corte y 45 días después (idealmente el último día).
 
 ### 2. Conversión a Parquet
 
 ```bash
 7z x 24DSF202609.7Z -odata/24DSF202609
 cendeu convertir data/24DSF202609/24DSF.txt data/deudores_24m --corte 202609 --control data/24DSF202609/24DSF_control.txt
-python -m cendeu.paquete ~/Downloads data --periodo 202609 --padron 20261030
+python -m cendeu.paquete ~/Downloads data --periodo 202609 --padron 20261030 --cheques 20261031
 ```
 
 El conversor del paquete mensual valida el largo de cada registro contra su LEAME antes de convertir.
@@ -53,7 +53,8 @@ cendeu ipc --desde 202409 --hasta 202609 --salida referencias/ipc.csv
 
 # Base limpia: 24DSF + mensual en el mes de corte, equivalencias de entidades, CUITs reemplazados, pesos constantes
 cendeu base data/deudores_24m data/v2/base --mensual data/deudores_mensual \
-    --padron data/padron/corte=20261030/padron.parquet --uno-dsf data/desde_sit1/periodo=202609/data.parquet --base-ipc 202609
+    --padron data/padron/corte=20261030/padron.parquet --uno-dsf data/desde_sit1/periodo=202609/data.parquet --base-ipc 202609 \
+    --cheques data/cheques
 
 # Variables del catálogo a cada fecha de observación (con target a 6 meses si hay desempeño)
 cendeu variables-v2 data/v2/base data/v2/variables --obs 202509 202510 202511 202512 202601 202602 202603
@@ -94,7 +95,7 @@ Cada base guarda en `_meta.json` el hash del IPC y de las referencias que usó, 
 
 ### 4. Actualización mensual (`cendeu actualizar`)
 
-Con cada corte nuevo, lo único manual es bajar de ARCA los seis paquetes del punto 1 (comprimidos o descomprimidos) a una carpeta de entrada. El resto lo hace un comando:
+Con cada corte nuevo, lo único manual es bajar de ARCA los siete paquetes del punto 1, los seis de deudores y la foto de cheques (comprimidos o descomprimidos), a una carpeta de entrada. El resto lo hace un comando:
 
 ```bash
 # ¿Llegó el corte? (sale con 1 si falta algún paquete; el corte por defecto es el mes siguiente al último cargado)
@@ -109,9 +110,9 @@ cendeu actualizar --datos ~/cendeu/datos --entrada ~/cendeu/entrada
 
 | Paso | Qué hace |
 |---|---|
-| `convertir` | 24DSF a Parquet y control contra `24DSF_control.txt`; paquete mensual y padrón a Parquet (descomprime con `7z` si hace falta) |
+| `convertir` | 24DSF a Parquet y control contra `24DSF_control.txt`; paquete mensual, padrón y cheques a Parquet (descomprime con `7z` si hace falta) |
 | `ipc` | Actualiza `referencias/ipc.csv` desde la API del INDEC; los meses sin publicar quedan imputados |
-| `controles` | Totales del BCRA, 24 meses completos, rectificaciones en los meses solapados, mes nuevo contra el anterior, entidades sin tipo, IPC. Con un error frena antes de tocar los datos |
+| `controles` | Totales del BCRA, 24 meses completos, rectificaciones en los meses solapados, mes nuevo contra el anterior, entidades sin tipo, IPC, foto de cheques. Con un error frena antes de tocar los datos |
 | `promover` | Reemplaza los meses del corte anterior (los viejos quedan en `_actualizaciones/AAAAMM/reemplazados`) |
 | `base` | Base v2 nueva con el mismo mes base de IPC; el mensual reemplaza al 24DSF sólo en el mes de corte |
 | `variables` | Fechas nuevas: el corte (foto actual, sin target) y corte − 6 (primera con desempeño completo; se rehace aunque exista, porque se armó como foto y recién ahora lleva target). `--recalcular` rehace también las anteriores con la historia rectificada |
@@ -119,7 +120,7 @@ cendeu actualizar --datos ~/cendeu/datos --entrada ~/cendeu/entrada
 | `subir` | S3 y registro en `_control/` (`--simular-s3` para ver qué subiría) |
 | `resumen` | `reportes/actualizaciones/AAAAMM.md` |
 
-**Revisión programada.** `cendeu programar` instala una tarea de launchd que todos los días a las 9:00 (o al despertar la Mac, si estaba dormida) corre `cendeu revisar`. Si los seis paquetes del corte están en `~/cendeu/entrada`, `cendeu revisar` corre la actualización completa, **incluida la subida a S3**, y avisa con una notificación de macOS al empezar y al terminar. Si llegó sólo una parte o un control frena, avisa una vez. El log queda en `~/cendeu/datos/_actualizaciones/revisar.log`.
+**Revisión programada.** `cendeu programar` instala una tarea de launchd que todos los días a las 9:00 (o al despertar la Mac, si estaba dormida) corre `cendeu revisar`. Si los siete paquetes del corte están en `~/cendeu/entrada`, `cendeu revisar` corre la actualización completa, **incluida la subida a S3**, y avisa con una notificación de macOS al empezar y al terminar. Si llegó sólo una parte o un control frena, avisa una vez. El log queda en `~/cendeu/datos/_actualizaciones/revisar.log`.
 
 ```bash
 cendeu programar                 # instala (--hora 7 --minuto 30 para otro horario)
@@ -134,7 +135,7 @@ Todo lo nuevo se arma en `<datos>/_actualizaciones/AAAAMM/` y se mueve a su luga
 
 ### Salidas
 
-- **Variables**: `variables/periodo_obs=AAAAMM/parte_XX.parquet`, una fila por CUIT presente en la central en esa fecha. Columnas: `CUIT`, `PERIODO_OBS`, `EN_POBLACION` (situación ≤ 2, no fallecido), `CEN_TGT_SIT3P_6M` (nulo si el desempeño no está completo) y las 149 variables `CEN_*`.
+- **Variables**: `variables/periodo_obs=AAAAMM/parte_XX.parquet`, una fila por CUIT presente en la central en esa fecha. Columnas: `CUIT`, `PERIODO_OBS`, `EN_POBLACION` (situación ≤ 2, no fallecido), `CEN_TGT_SIT3P_6M` (nulo si el desempeño no está completo) y las 165 variables `CEN_*` (las 16 de cheques, nulas en los meses sin foto de cheques).
 - **Documentación**: [`docs/variables.md`](docs/variables.md) y [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv).
 - **Validación multivariada**: [`reportes/validacion_v2/`](reportes/validacion_v2/). Un scorecard por segmento (situación 1 y 2) ajustado sólo para probar las variables en conjunto: poder fuera de muestra, estabilidad y comparación con las variables v1. No es un modelo para producción.
 - **Informe de poder**: [`reportes/poder_v2/`](reportes/poder_v2/) y su página en [`reportes/poder_v2/pagina/`](reportes/poder_v2/pagina/), publicada como artifact en claude.ai. Para actualizar la página después de recalcular el informe, se corre `cendeu pagina-poder` y se reemplazan los tres CSV en el panel de fuentes; el HTML no cambia.

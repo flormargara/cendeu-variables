@@ -1,6 +1,6 @@
 # Plan v2 — Variables CENDEU
 
-Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA, archivo `24DSF`). El repo es sólo de variables: los modelos de PD que las usen van en otros proyectos. Se sigue el enfoque del Feature Store CRC: variables diseñadas por dominio de riesgo (no por disponibilidad), dinámica temporal (VAR, TEN, FMX, RSI), documentación completa y medición de poder antes de usarlas.
+Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA, archivo `24DSF`) y, desde 202610, la Central de Cheques Rechazados. El repo es sólo de variables: los modelos de PD que las usen van en otros proyectos. Se sigue el enfoque del Feature Store CRC: variables diseñadas por dominio de riesgo (no por disponibilidad), dinámica temporal (VAR, TEN, FMX, RSI), documentación completa y medición de poder antes de usarlas.
 
 ## Decisiones tomadas
 
@@ -14,6 +14,7 @@ Rediseño de las variables de comportamiento sobre la Central de Deudores (BCRA,
 | Almacenamiento | `s3://data-cendeu-raw` (perfil `fmargara`, política [`infra/cendeu-s3-policy.json`](infra/cendeu-s3-policy.json)), una carpeta por período. |
 | v1 | Variables y scores v1 se subieron sólo como línea de base y se borraron de S3 el 2026-11-15, al quedar la v2 completa (*fresh start*, registro en `_control/borrados.csv`). |
 | Repo | Se mantiene el repo actual; el rediseño se hace sobre él. |
+| Cheques rechazados | Decidido el 2026-11-25. Cada descarga es una foto de la central (con sesgo de supervivencia: los levantados viejos se dan de baja), así que no se reconstruyen fechas pasadas: se acumula una foto por mes desde 20261031 como séptimo paquete del corte. Cada mes usa la foto más cercana tomada entre su último día y 45 días después, reconstruida al fin de mes con las fechas. Bloque B11 (16 variables, `uso: futuro` hasta medir su poder). |
 
 ## Layout S3
 
@@ -27,6 +28,7 @@ s3://data-cendeu-raw/
   desde_sit1/periodo=AAAAMM/data.parquet      1DSF: desde cuándo en situación 1
   rectificativas/publicado=AAAAMM/…           inf_ret e inf_retparc
   padron/corte=AAAAMMDD/…                     padrón ARCA y nomenclador de actividades
+  cheques/corte=AAAAMMDD/data.parquet         foto de la Central de Cheques Rechazados (una por corte)
   docs/                                       diccionario e informes
   _control/ingestas.csv                       registro por período del bianual: corte de origen, filas, CUITs, entidades, monto, estado
   referencias/ipc|entidades/corte=AAAAMM/      IPC y tablas de entidades usadas en cada corte
@@ -45,7 +47,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 | 0 | Carga inicial a S3 | 24 períodos de deudores + v1 + registro de control | hecho (tamaños verificados contra local; la v1 se borró el 2026-11-15) |
 | 1 | Estudio de datos del 24DSF | [`reportes/estudio_24dsf.md`](reportes/estudio_24dsf.md) | hecho |
 | 1b | Fuentes complementarias (mensual, maestro de entidades, 1DSF, rectificativas, padrón ARCA) | [`reportes/fuentes_bcra_arca.md`](reportes/fuentes_bcra_arca.md), [`referencias/`](referencias/) | hecho (subidas a S3, registro en `_control/fuentes.csv`) |
-| 2 | Catálogo de variables por bloques | [`catalogo/variables.yaml`](catalogo/variables.yaml) (149 variables, validado por `cendeu.catalogo` y test) | hecho (signos esperados corregidos con la Fase 5 el 2026-11-22; la hipótesis original queda en `observaciones`) |
+| 2 | Catálogo de variables por bloques | [`catalogo/variables.yaml`](catalogo/variables.yaml) (165 variables, validado por `cendeu.catalogo` y test; 16 de cheques agregadas el 2026-11-25) | hecho (signos esperados corregidos con la Fase 5 el 2026-11-22; la hipótesis original queda en `observaciones`) |
 | 3 | Implementación: SQL generado desde el catálogo, grilla densa CUIT×mes, comando de subida a S3, tests | [`src/cendeu/v2.py`](src/cendeu/v2.py), [`src/cendeu/s3.py`](src/cendeu/s3.py), [`tests/test_v2.py`](tests/test_v2.py) | hecho: base v2 y variables de las 7 fechas (202509–202603) subidas a S3 (417 archivos de base y 112 partes de variables, tamaños verificados; registro en `_control/`) |
 | 4 | Documentación de variables (diccionario + documento técnico) | [`docs/diccionario_variables.csv`](docs/diccionario_variables.csv), [`docs/variables.md`](docs/variables.md), generados con `cendeu documentar` | hecho |
 | 4b | Informe de variables mix CENDEU + transaccionalidad propia (entidad que informa / que no informa) | [`docs/variables_mix.md`](docs/variables_mix.md) | hecho (diseño; implementar cuando haya datos propios) |
@@ -79,7 +81,8 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 ## Pendientes
 
 - Cuando exista el proyecto de modelos: pasar allí `scorecard.py`, `scoring.py` y el scorecard v1.
-- Corte 202610: bajar los seis paquetes de ARCA a `~/cendeu/entrada` cuando estén (el de 202609 se procesó el 2026-11-05, así que se espera a principios de diciembre); la revisión diaria hace el resto.
+- Corte 202610: bajar los seis paquetes de ARCA a `~/cendeu/entrada` cuando estén (el de 202609 se procesó el 2026-11-05, así que se espera a principios de diciembre) y copiar ahí `20261031CHEQUES.7z` (está en `~/projects/cendeu-crudos/`); la revisión diaria hace el resto.
+- Cheques: bajar la foto todos los meses (idealmente el último día del mes). Con target desde el corte 202704 (fecha 202610), medir su poder con `cendeu poder` y decidir qué variables pasan a `uso: modelo`.
 - Actualización mensual, etapa 3 (opcional): correrla en AWS con el rol `data-cendeu`, disparada al llegar los paquetes a `s3://data-cendeu-raw/entrada/AAAAMM/`.
 
 ## Bloques de variables (Fase 2)
@@ -94,6 +97,7 @@ Cada 24DSF nuevo trae 24 meses: se agrega el período nuevo y se **reemplazan** 
 8. **Foto actual del mensual**: días de atraso, refinanciación, recategorización obligatoria, situación jurídica, garante, deuda con fideicomiso de recupero.
 9. **Persona (padrón ARCA y 1DSF)**: edad o antigüedad de la empresa, actividad registrada, provincia, meses en situación normal. Sexo sólo para monitorear sesgos.
 10. **Alertas combinadas** (incluye fallecido con deuda).
+11. **Cheques rechazados** (Central de Cheques Rechazados): rechazos sin fondos y su monto a 3/6/12 meses, vicios formales, impagos y su monto, proporción levantada, recencia, multa impaga, monto rechazado sobre deuda, y cheques de las personas jurídicas vinculadas.
 
 ## Diferencias con el CRC a tener en cuenta
 
