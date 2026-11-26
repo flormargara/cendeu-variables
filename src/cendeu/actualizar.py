@@ -3,8 +3,8 @@
 La descarga queda manual (ARCA pide clave fiscal y aceptar la DJ de la Ley 25.326). Todo lo demás corre con
 ``cendeu actualizar``:
 
-    detectar    ¿están los seis paquetes del corte en la carpeta de entrada? (sirve para una revisión programada)
-    convertir   24DSF → Parquet + control contra 24DSF_control.txt; paquete mensual y padrón → Parquet
+    detectar    ¿están los siete paquetes del corte en la carpeta de entrada? (sirve para una revisión programada)
+    convertir   24DSF → Parquet + control contra 24DSF_control.txt; paquete mensual, padrón y cheques → Parquet
     ipc         IPC INDEC hasta el corte (imputa los meses sin publicar y lo avisa)
     controles   compara el corte nuevo con el anterior; con un error frena antes de tocar nada
     promover    reemplaza en la carpeta de datos los meses del corte anterior (los viejos quedan en _actualizaciones)
@@ -65,9 +65,10 @@ def _q(path) -> str:
 
 # --------------------------------------------------------------------------- detectar
 def paquetes(corte: int) -> dict[str, str]:
-    """Nombre de cada paquete de ARCA para el corte (el padrón tiene fecha propia: ``AAAAMMDDPADRON``)."""
+    """Nombre de cada paquete de ARCA para el corte (el padrón y los cheques tienen fecha propia:
+    ``AAAAMMDDPADRON``, ``AAAAMMDDCHEQUES``)."""
     return {"24dsf": f"24DSF{corte}", "mensual": f"{corte}DEUDORES", "1dsf": f"1DSF{corte}",
-            "inf_ret": f"{corte}INFRET", "inf_retpa": f"{corte}INFRETPA", "padron": "PADRON"}
+            "inf_ret": f"{corte}INFRET", "inf_retpa": f"{corte}INFRETPA", "padron": "PADRON", "cheques": "CHEQUES"}
 
 
 def _buscar(entrada: Path, nombre: str) -> Path | None:
@@ -95,21 +96,39 @@ def _buscar_padron(entrada: Path, corte: int) -> tuple[Path | None, int | None]:
     return p, fecha
 
 
+def _buscar_cheques(entrada: Path, corte: int) -> tuple[Path | None, int | None]:
+    """La foto de cheques (``AAAAMMDDCHEQUES``) que ``v2.fotos_cheques`` asigna al mes de corte: la más cercana
+    tomada entre su último día y ``v2.TOLERANCIA_CHEQUES`` días después."""
+    cands = {}
+    for p in entrada.iterdir() if entrada.exists() else []:
+        n = p.name.upper().removesuffix(".7Z").removesuffix(".ZIP")
+        if n.endswith("CHEQUES") and len(n) == 15 and n[:8].isdigit():
+            fecha = int(n[:8])
+            if fecha not in cands or p.is_dir():   # la carpeta antes que el comprimido
+                cands[fecha] = p
+    fecha = v2.fotos_cheques(sorted(cands), [corte]).get(corte)
+    return (cands[fecha], fecha) if fecha else (None, None)
+
+
 def detectar(entrada: str | Path, corte: int) -> dict:
-    """``{"completo": bool, "faltan": [...], "encontrados": {clave: ruta}, "padron": AAAAMMDD}``."""
+    """``{"completo": bool, "faltan": [...], "encontrados": {clave: ruta}, "padron": AAAAMMDD, "cheques": AAAAMMDD}``."""
     entrada = Path(entrada)
     encontrados, faltan = {}, []
     for clave, nombre in paquetes(corte).items():
         if clave == "padron":
-            p, fecha = _buscar_padron(entrada, corte)
+            p, _ = _buscar_padron(entrada, corte)
+            falta = f"AAAAMMDDPADRON posterior a {corte}"
+        elif clave == "cheques":
+            p, _ = _buscar_cheques(entrada, corte)
+            falta = f"AAAAMMDDCHEQUES desde el fin de {corte} hasta {v2.TOLERANCIA_CHEQUES} días después"
         else:
-            p, fecha = _buscar(entrada, nombre), None
+            p, falta = _buscar(entrada, nombre), nombre
         if p is None:
-            faltan.append(nombre if clave != "padron" else f"AAAAMMDDPADRON posterior a {corte}")
+            faltan.append(falta)
         else:
             encontrados[clave] = str(p)
     return {"corte": corte, "completo": not faltan, "faltan": faltan, "encontrados": encontrados,
-            "padron": _buscar_padron(entrada, corte)[1]}
+            "padron": _buscar_padron(entrada, corte)[1], "cheques": _buscar_cheques(entrada, corte)[1]}
 
 
 def proximo_corte(datos: str | Path) -> int:
@@ -187,7 +206,8 @@ def _nivel(cambio: float, alerta: float, error: float) -> str:
 
 
 def controles(corte: int, nuevo_24dsf: Path, anterior_24dsf: Path, mensual: Path | None,
-              control_24dsf: dict | None, referencias: Path, ipc_csv: Path, memoria: str = "10GB") -> dict:
+              control_24dsf: dict | None, referencias: Path, ipc_csv: Path, memoria: str = "10GB",
+              cheques: Path | None = None) -> dict:
     """Controles del corte nuevo. Devuelve ``{"filas": [...], "stats": {...}, "errores": n, "alertas": n}``.
 
     Cada fila: ``control``, ``nivel`` (ok/alerta/error) y ``detalle``. Las stats por período (filas, CUITs,
@@ -267,6 +287,20 @@ def controles(corte: int, nuevo_24dsf: Path, anterior_24dsf: Path, mensual: Path
     fila("IPC hasta el corte", "error" if sin_ipc else "alerta" if imputados else "ok",
          f"sin IPC: {sin_ipc}" if sin_ipc else f"imputados: {imputados} (rehacer cuando el INDEC publique)" if imputados
          else "publicado para los 24 meses")
+    # 7. foto de cheques rechazados: completa y con rechazos hasta cerca de su fecha
+    if cheques is not None:
+        if not cheques.exists():
+            fila("Foto de cheques rechazados", "error", f"no está {cheques}")
+        else:
+            foto = int(cheques.parent.name.split("=")[1])
+            n, cuits, ult, malas = con.execute(f"""
+                SELECT count(*), count(DISTINCT cuit), max(fecha_rechazo),
+                       count(*) FILTER (fecha_rechazo IS NULL OR monto IS NULL OR causal NOT IN (1, 2))
+                FROM read_parquet('{_q(cheques)}')""").fetchone()
+            atraso = (dt.date(foto // 10000, foto // 100 % 100, foto % 100) - ult).days if ult else None
+            fila("Foto de cheques rechazados", "error" if not n or malas else "alerta" if atraso is None or atraso > 7 else "ok",
+                 f"foto {foto}: {n:,} filas, {cuits:,} CUITs, último rechazo {ult} ({atraso} días antes de la foto)"
+                 + (f"; {malas:,} filas sin fecha, monto o causal válida" if malas else ""))
     con.close()
     return {"filas": out, "stats": nuevo, "errores": sum(f["nivel"] == "error" for f in out),
             "alertas": sum(f["nivel"] == "alerta" for f in out)}
@@ -374,7 +408,7 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
     det = detectar(ent, corte)
     if not det["completo"]:
         raise SystemExit(f"Corte {corte} incompleto en {ent}: faltan {', '.join(det['faltan'])}")
-    padron_corte = det["padron"]
+    padron_corte, cheques_corte = det["padron"], det["cheques"]
     stg = trabajo / "nuevo"
     ultimo = PASOS[-1] if hasta is None else hasta
 
@@ -400,12 +434,14 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
             # el conversor del paquete espera <dir>/<NOMBRE>/<archivo>: se arma con enlaces a las carpetas extraídas
             vista = trabajo / "paquete"
             vista.mkdir(exist_ok=True)
-            for k, nombre in {**paquetes(corte), "padron": f"{padron_corte}PADRON"}.items():
+            for k, nombre in {**paquetes(corte), "padron": f"{padron_corte}PADRON", "cheques": f"{cheques_corte}CHEQUES"}.items():
                 if k != "24dsf" and not (vista / nombre).exists():
                     (vista / nombre).symlink_to(carpetas[k].resolve())
-            filas = paquete.convertir_todo(vista, stg, corte, padron_corte, memoria, tmp=trabajo / "tmp_conv")
+            filas = paquete.convertir_todo(vista, stg, corte, padron_corte, memoria, tmp=trabajo / "tmp_conv",
+                                           cheques=cheques_corte)
             shutil.rmtree(trabajo / "tmp_conv", ignore_errors=True)
-            est.guardar(paso, control_24dsf=ctrl, filas_paquete=filas, padron=padron_corte, segundos=round(time.time() - t0))
+            est.guardar(paso, control_24dsf=ctrl, filas_paquete=filas, padron=padron_corte, cheques=cheques_corte,
+                        segundos=round(time.time() - t0))
 
         elif paso == "ipc" and correr(paso):
             ipc_nuevo = trabajo / "ipc.csv"
@@ -427,7 +463,8 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
         elif paso == "controles" and correr(paso):
             r = controles(corte, stg / "deudores_24m", datos / "deudores_24m",
                           stg / "deudores_mensual" / f"periodo={corte}" / "data.parquet",
-                          est.info("convertir").get("control_24dsf"), ref, ref / "ipc.csv", memoria)
+                          est.info("convertir").get("control_24dsf"), ref, ref / "ipc.csv", memoria,
+                          cheques=stg / "cheques" / f"corte={cheques_corte}" / "data.parquet")
             for f in r["filas"]:
                 print(f"  {f['nivel']:>6}  {f['control']}: {f['detalle']}", flush=True)
             if r["errores"] and not forzar:
@@ -465,7 +502,7 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
                               mensual=datos / "deudores_mensual",
                               padron=datos / "padron" / f"corte={padron_corte}" / "padron.parquet",
                               uno_dsf=datos / "desde_sit1" / f"periodo={corte}" / "data.parquet",
-                              base_ipc=meta.get("base_ipc"), reemplazo_mensual=[corte], **kw)
+                              base_ipc=meta.get("base_ipc"), reemplazo_mensual=[corte], cheques=datos / "cheques", **kw)
             if base_actual.exists():
                 shutil.move(str(base_actual), str(trabajo / "base_anterior"))
             shutil.move(str(base_nueva), str(base_actual))
@@ -502,7 +539,7 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
                         segundos=round(time.time() - t0))
 
         elif paso == "subir" and correr(paso):
-            subidos = _subir(corte, datos, padron_corte, est, ref, perfil, simular_s3)
+            subidos = _subir(corte, datos, padron_corte, est, ref, perfil, simular_s3, cheques_corte)
             est.guardar(paso, simulado=simular_s3, **subidos, segundos=round(time.time() - t0))
 
         elif paso == "resumen" and correr(paso):
@@ -511,7 +548,8 @@ def actualizar(corte: int, entrada: str, datos: str | Path, *, referencias: str 
     return est.datos
 
 
-def _subir(corte: int, datos: Path, padron_corte: int, est: Estado, ref: Path, perfil: str, simular: bool) -> dict:
+def _subir(corte: int, datos: Path, padron_corte: int, est: Estado, ref: Path, perfil: str, simular: bool,
+           cheques_corte: int | None = None) -> dict:
     hoy = _ahora() + "Z"
     stats = {int(k): v for k, v in est.info("controles").get("stats", {}).items()}
     filas_ing, filas_fue, filas_var, n = [], [], [], 0
@@ -533,7 +571,7 @@ def _subir(corte: int, datos: Path, padron_corte: int, est: Estado, ref: Path, p
                           "bytes": sum(f["bytes"] for f in r), "ruta_s3": r[0]["ruta_s3"] if r else "", "estado": r[0]["estado"] if r else ""})
     filas_paq = est.info("convertir").get("filas_paquete", {})
     subidas: dict[Path, list[dict]] = {}
-    for nombre, (src, _, dst) in paquete.trabajos(Path("."), datos, corte, padron_corte).items():
+    for nombre, (src, _, dst) in paquete.trabajos(Path("."), datos, corte, padron_corte, cheques_corte).items():
         rel = dst.relative_to(datos)
         if dst.parent not in subidas:   # padrón y rectificativas tienen dos archivos por carpeta
             subidas[dst.parent] = subir(dst.parent, str(rel.parent))

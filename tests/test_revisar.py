@@ -19,7 +19,7 @@ def entorno(tmp_path):
 
 
 def _paquetes(entrada, faltan=()):
-    for n in ["24DSF202610", "202610DEUDORES", "1DSF202610", "202610INFRET", "202610INFRETPA", "20261201PADRON"]:
+    for n in ["24DSF202610", "202610DEUDORES", "1DSF202610", "202610INFRET", "202610INFRETPA", "20261201PADRON", "20261031CHEQUES"]:
         if n not in faltan:
             (entrada / n).mkdir()
 

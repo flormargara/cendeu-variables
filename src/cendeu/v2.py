@@ -100,14 +100,78 @@ def _q(path) -> str:
     return str(path).replace("'", "''")
 
 
+# --------------------------------------------------------------------------- cheques
+TOLERANCIA_CHEQUES = 45   # días máximos entre el fin del mes de observación y la foto de cheques que se usa
+
+
+def _fin_mes(p: int) -> dt.date:
+    siguiente = periodo_mas(p, 1)
+    return dt.date(siguiente // 100, siguiente % 100, 1) - dt.timedelta(days=1)
+
+
+def fotos_cheques(fechas: list[int], periodos: list[int], tolerancia: int = TOLERANCIA_CHEQUES) -> dict[int, int]:
+    """``{período: foto AAAAMMDD}``: para cada período, la foto de la Central de Cheques Rechazados más cercana
+    tomada desde el último día del mes y hasta ``tolerancia`` días después. Una foto es el estado de la central
+    el día en que se bajó; con las fechas de rechazo, levantamiento y pago de multa se reconstruye el estado al
+    fin del mes. Lo que no se puede reconstruir son los cheques dados de baja entre el fin de mes y la foto
+    (por eso la tolerancia corta). Sin foto en ese rango, las variables de cheques del período quedan nulas."""
+    salida = {}
+    for p in periodos:
+        fin = _fin_mes(p)
+        cands = [f for f in fechas
+                 if 0 <= (dt.date(f // 10000, f // 100 % 100, f % 100) - fin).days <= tolerancia]
+        if cands:
+            salida[p] = min(cands)
+    return salida
+
+
+def _cheques_sql(foto: Path, p: int, ipc_base: float, n_buckets: int) -> str:
+    """Resumen por CUIT de la foto de cheques al último día del mes ``p``. Montos en miles de pesos constantes
+    (IPC del mes del rechazo; los anteriores al IPC versionado usan el primer mes disponible)."""
+    fin = _fin_mes(p).isoformat()
+    ventana = lambda v: f"mes BETWEEN {periodo_mas(p, -(v - 1))} AND {p}"
+    sf = lambda v: f"causal = 2 AND {ventana(v)}"
+    impago = f"(fecha_levantamiento IS NULL OR fecha_levantamiento > DATE '{fin}')"
+    return f"""
+      WITH c AS (
+        SELECT DISTINCT coalesce(rp.cuit_reemplazo, f.cuit) AS cuit, f.cuit_relacionado AS rel, f.nro_cheque, f.fecha_rechazo,
+               f.monto, f.causal, f.fecha_levantamiento, f.pago_multa,
+               year(f.fecha_rechazo) * 100 + month(f.fecha_rechazo) AS mes
+        FROM read_parquet('{_q(foto)}') f LEFT JOIN reemp rp ON rp.cuit = f.cuit
+        WHERE f.fecha_rechazo <= DATE '{fin}'),
+      d AS (
+        SELECT c.*, c.monto / 1000 * {ipc_base} / coalesce(i.ipc, (SELECT ipc FROM ipc ORDER BY periodo LIMIT 1)) AS mto
+        FROM c LEFT JOIN ipc i ON i.periodo = c.mes)
+      SELECT cuit, {p} AS periodo,
+        count(*) FILTER (rel IS NULL AND {sf(3)}) AS CHQ_SF_3,
+        count(*) FILTER (rel IS NULL AND {sf(6)}) AS CHQ_SF_6,
+        count(*) FILTER (rel IS NULL AND {sf(12)}) AS CHQ_SF_12,
+        coalesce(sum(mto) FILTER (rel IS NULL AND {sf(3)}), 0) AS CHQ_MTO_SF_3,
+        coalesce(sum(mto) FILTER (rel IS NULL AND {sf(6)}), 0) AS CHQ_MTO_SF_6,
+        coalesce(sum(mto) FILTER (rel IS NULL AND {sf(12)}), 0) AS CHQ_MTO_SF_12,
+        count(*) FILTER (rel IS NULL AND causal = 1 AND {ventana(12)}) AS CHQ_VF_12,
+        count(*) FILTER (rel IS NULL AND {sf(12)} AND NOT {impago}) AS CHQ_LEV_12,
+        count(*) FILTER (rel IS NULL AND causal = 2 AND {impago}) AS CHQ_IMPAGOS,
+        coalesce(sum(mto) FILTER (rel IS NULL AND causal = 2 AND {impago}), 0) AS CHQ_MTO_IMPAGOS,
+        count(*) FILTER (rel IS NULL AND causal = 2 AND (pago_multa = 'IMPAGA'
+                         OR TRY_STRPTIME(pago_multa, '%d/%m/%Y')::DATE > DATE '{fin}')) AS CHQ_MULTA_IMPAGA,
+        {mi(p)} - max(mes // 100 * 12 + mes % 100) FILTER (rel IS NULL AND causal = 2 AND {ventana(12)}) AS CHQ_RCM_SF,
+        count(DISTINCT (rel, nro_cheque, fecha_rechazo, monto)) FILTER (rel IS NOT NULL AND {sf(12)}) AS CHQ_REL_SF_12,
+        count(DISTINCT rel) FILTER (rel IS NOT NULL AND {sf(12)}) AS CHQ_REL_EMP_12,
+        count(DISTINCT (rel, nro_cheque, fecha_rechazo, monto)) FILTER (rel IS NOT NULL AND causal = 2 AND {impago}) AS CHQ_REL_IMPAGOS,
+        cuit % {n_buckets} AS bucket
+      FROM d GROUP BY cuit"""
+
+
 # --------------------------------------------------------------------------- base
 def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, referencias: str | Path,
                    mensual: str | Path | None = None, padron: str | Path | None = None,
                    uno_dsf: str | Path | None = None, base_ipc: int | None = None,
                    n_buckets: int = N_BUCKETS, hilos: int = 6, desde: int | None = None,
                    solo: list[int] | None = None, extras: bool = True,
-                   reemplazo_mensual: list[int] | None = None, **kw) -> Path:
-    """Escribe ``dst/deudores/periodo=P/bucket=B``, ``dst/persona/bucket=B`` y ``dst/mensual/periodo=P/bucket=B``.
+                   reemplazo_mensual: list[int] | None = None, cheques: str | Path | None = None, **kw) -> Path:
+    """Escribe ``dst/deudores/periodo=P/bucket=B``, ``dst/persona/bucket=B``, ``dst/mensual/periodo=P/bucket=B`` y
+    ``dst/cheques/periodo=P/bucket=B``.
 
     ``mensual``: directorio con ``periodo=P/data.parquet`` del deudores.txt convertido; esos períodos
     reemplazan al 24DSF (el 24DSF omite entidades en su primer mes). ``reemplazo_mensual``: limita el reemplazo
@@ -115,6 +179,9 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
     completos y rectificados); el resumen de campos del mensual se arma igual para todos los meses que haya.
     Cada período se escribe bucket por bucket: un COPY particionado de un mes completo (~40 M filas)
     no entra en 10 GB.
+
+    ``cheques``: directorio con ``corte=AAAAMMDD/data.parquet`` (fotos de la Central de Cheques Rechazados); cada
+    período usa la foto que le asigna ``fotos_cheques``.
     """
     dst, ref = Path(dst), Path(referencias)
     dst.mkdir(parents=True, exist_ok=True)
@@ -187,6 +254,8 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
 
     if not extras:
         return dst
+    fechas_chq = sorted(int(d.name.split("=")[1]) for d in Path(cheques).glob("corte=*")) if cheques else []
+    asignadas = fotos_cheques(fechas_chq, periodos)
     with con_base() as con:
         imputados = [r[0] for r in con.execute(
             f"SELECT periodo FROM read_csv('{_q(ipc_csv)}', header = true) WHERE imputado = 1 AND periodo <= {max(periodos)}").fetchall()]
@@ -195,7 +264,8 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
         periodos_mensual=periodos_men, reemplazo_mensual=reemplazan, base_ipc=base, ipc_base=ipc_base, ipc_imputados=imputados,
         archivos={"ipc": _hash(ipc_csv), "entidades": _hash(ref / "entidades.csv"),
                   "equivalencias": _hash(ref / "entidades_equivalencias.csv")},
-        padron=str(padron) if padron else None, uno_dsf=str(uno_dsf) if uno_dsf else None, n_buckets=n_buckets))
+        padron=str(padron) if padron else None, uno_dsf=str(uno_dsf) if uno_dsf else None, n_buckets=n_buckets,
+        cheques={str(p): f for p, f in asignadas.items()}))
     if imputados:
         print(f"ATENCIÓN: IPC imputado en {imputados}; rehacer la base cuando el INDEC lo publique", flush=True)
     with con_base() as con:
@@ -234,6 +304,11 @@ def construir_base(dir_24dsf: str | Path, dst: str | Path, ipc_csv: str | Path, 
                   GROUP BY ALL
                 ) TO '{_q(dst / "mensual")}' (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (periodo, bucket), OVERWRITE_OR_IGNORE true)
             """)
+        # Cheques rechazados: resumen por CUIT al fin de cada mes que tenga foto
+        for p, f in asignadas.items():
+            con.execute(f"""COPY ({_cheques_sql(Path(cheques) / f"corte={f}" / "data.parquet", p, ipc_base, n_buckets)})
+                TO '{_q(dst / "cheques")}' (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (periodo, bucket), OVERWRITE_OR_IGNORE true)""")
+            print(f"cheques {p}: foto {f}", flush=True)
     return dst
 
 
@@ -322,18 +397,21 @@ def _series_sql(t: int) -> str:
     """
 
 
-def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool, primero: int) -> tuple[str, str]:
+def _variables_sql(cat: cat_mod.Catalogo, t: int, mensual_disponible: bool, primero: int,
+                   cheques_disponible: bool = False) -> tuple[str, str]:
     """Expresiones del catálogo. Quedan nulas, en vez de dar un valor sesgado:
     - las variables con ``disponible_desde`` posterior a t (p. ej. fotos de 202609: usarlas en fechas
       anteriores filtra información del desempeño);
     - las que necesitan el mes previo a su ventana (``requiere_mes_previo``) cuando ese mes es anterior
       al inicio de la historia;
-    - las del mensual si no hay mensual para t.
+    - las del mensual si no hay mensual para t, y las de cheques si no hay foto de cheques para t.
     """
     capa1, capa2 = [], []
     for v in cat.variables:
         expr = v["sql"]
         if v["fuente"] == "MENSUAL" and not mensual_disponible:
+            expr = "NULL"
+        if "CHEQUES" in v["fuente"] and not cheques_disponible:
             expr = "NULL"
         if t < int(v.get("disponible_desde") or 0):
             expr = "NULL"
@@ -385,7 +463,9 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
         primero = con.execute("SELECT min(periodo) FROM base").fetchone()[0]
         mensual_dir = base / "mensual" / f"periodo={obs}"
         hay_mensual = mensual_dir.exists()
-        capa1, capa2 = _variables_sql(cat, obs, hay_mensual, primero)
+        cheques_dir = base / "cheques" / f"periodo={obs}"
+        hay_cheques = cheques_dir.exists()
+        capa1, capa2 = _variables_sql(cat, obs, hay_mensual, primero, hay_cheques)
         target = cat.meta["targets"][0]["nombre"]
         for k in buckets if buckets is not None else range(n_buckets):
             parte = out / f"parte_{k:02d}.parquet"
@@ -422,6 +502,10 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                 con.execute(f"CREATE OR REPLACE TEMP TABLE mm AS SELECT * FROM read_parquet('{_q(mensual_dir)}/*/*.parquet', hive_partitioning = true) WHERE bucket = {k}{fm}")
             else:
                 con.execute("CREATE OR REPLACE TEMP TABLE mm AS SELECT NULL::BIGINT cuit WHERE false")
+            if hay_cheques:   # CUITs sin cheques en la foto: sin fila (las variables los llevan a 0)
+                con.execute(f"CREATE OR REPLACE TEMP TABLE chq AS SELECT * FROM read_parquet('{_q(cheques_dir)}/*/*.parquet', hive_partitioning = true) WHERE bucket = {k}{fm}")
+            else:
+                con.execute("CREATE OR REPLACE TEMP TABLE chq AS SELECT NULL::BIGINT cuit WHERE false")
             # Meses en situación 1 ininterrumpida (1DSF + 24DSF); se agrega a x antes de evaluar el catálogo
             con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE x2 AS
@@ -441,7 +525,7 @@ def construir_variables(dir_base: str | Path, obs: int, dst: str | Path, catalog
                       (ult(s.SIT) <= 2 AND coalesce(per.FALLECIDO, 0) = 0 AND tipo_persona(s.cuit) <> 'OTRO')::INT AS EN_POBLACION,
                       {f"(coalesce(tgt.sit_max_desemp, 0) >= 3)::INT" if desemp_ok else "NULL::INT"} AS {target},
                       {capa1}
-                    FROM s JOIN x2 x USING (cuit) LEFT JOIN per USING (cuit) LEFT JOIN mm USING (cuit) LEFT JOIN tgt USING (cuit))
+                    FROM s JOIN x2 x USING (cuit) LEFT JOIN per USING (cuit) LEFT JOIN mm USING (cuit) LEFT JOIN chq USING (cuit) LEFT JOIN tgt USING (cuit))
                   SELECT *{(", " + capa2) if capa2 else ""} FROM v1
                 ) TO '{_q(tmp_parte)}' (FORMAT parquet, {ZSTD})
             """)

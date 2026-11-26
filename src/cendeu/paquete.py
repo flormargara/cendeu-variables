@@ -1,11 +1,12 @@
 """Convierte los paquetes mensuales del BCRA/ARCA (ancho fijo, latin-1) a Parquet.
 
-Diseños de registro tomados de "LEAME DEUDORES.pdf" (v. 2026-01) y "LEAME PADRON.pdf" (v1.0).
+Diseños de registro tomados de "LEAME DEUDORES.pdf" (v. 2026-01), "LEAME PADRON.pdf" (v1.0) y
+"LEAME CHEQUES.pdf" (2024-12).
 Cada archivo se valida por largo de registro antes de convertir: si alguna línea no mide lo
 que dice el LEAME, se aborta (el BCRA cambió el diseño).
 
 Uso:
-    python -m cendeu.paquete <dir_downloads> <dir_salida> --periodo 202609 --padron 20261030
+    python -m cendeu.paquete <dir_downloads> <dir_salida> --periodo 202609 --padron 20261030 [--cheques 20261031]
     (``cendeu actualizar`` lo llama con ``trabajos``/``convertir_todo``).
 """
 import argparse
@@ -40,6 +41,13 @@ PADRON = [
 # El LEAME dice 254 para la descripción, pero el archivo real (corte 20261030) trae 260.
 ACTIVIDADES = [("actividad", 6, "int"), ("descripcion", 260, "str")]
 # Nomdeu.txt (CUIT + nombre) no se convierte: sólo nombres de personas, sin uso analítico.
+# Central de Cheques Rechazados ("LEAME CHEQUES.pdf"): foto completa al día del archivo (AAAAMMDDCHEQUES).
+# Con cuit_relacionado informado, la fila es el cheque de esa persona jurídica repetido en cada persona vinculada.
+CHEQUES = [
+    ("cuit", 11, "int"), ("nro_cheque", 10, "int"), ("fecha_rechazo", 8, "fecha"), ("monto", 15, "centavos"),
+    ("causal", 1, "int"), ("fecha_levantamiento", 8, "fecha"), ("revision", 1, "str"), ("judicial", 1, "str"),
+    ("cuit_relacionado", 11, "int"), ("pago_multa", 15, "str"),
+]
 
 
 def _expr(campos):
@@ -50,6 +58,10 @@ def _expr(campos):
             cols.append(f"TRY_CAST(nullif(trim({s}), '') AS BIGINT) AS {nombre}")
         elif tipo == "monto":
             cols.append(f"TRY_CAST(replace(nullif(trim({s}), ''), ',', '.') AS DECIMAL(14,1)) AS {nombre}")
+        elif tipo == "centavos":   # pesos con las dos últimas posiciones como decimales
+            cols.append(f"(TRY_CAST(nullif(trim({s}), '') AS BIGINT) / 100)::DECIMAL(15,2) AS {nombre}")
+        elif tipo == "fecha":      # AAAAMMDD
+            cols.append(f"TRY_STRPTIME(nullif(trim({s}), ''), '%Y%m%d')::DATE AS {nombre}")
         elif tipo == "str":
             cols.append(f"nullif(trim({s}), '') AS {nombre}")
         pos += largo
@@ -89,9 +101,12 @@ def convertir(c, src: pathlib.Path, campos, dst: pathlib.Path, tmp: pathlib.Path
     return malos[1]
 
 
-def trabajos(d: pathlib.Path, o: pathlib.Path, p: int, padron: int) -> dict:
-    """{nombre: (archivo de origen, diseño, destino)} del paquete mensual ``p`` y el padrón ``padron``."""
-    return {
+def trabajos(d: pathlib.Path, o: pathlib.Path, p: int, padron: int, cheques: int | None = None) -> dict:
+    """{nombre: (archivo de origen, diseño, destino)} del paquete mensual ``p``, el padrón ``padron`` y, si se
+    indica, la foto de cheques rechazados ``cheques`` (AAAAMMDD)."""
+    extra = {"cheques": (d / f"{cheques}CHEQUES/cheques.txt", CHEQUES, o / f"cheques/corte={cheques}/data.parquet")} \
+        if cheques else {}
+    return extra | {
         "maeent": (d / f"{p}DEUDORES/Maeent.txt", MAEENT, o / f"entidades/periodo={p}/maeent.parquet"),
         "1dsf": (d / f"1DSF{p}/1DSF.txt", UNO_DSF, o / f"desde_sit1/periodo={p}/data.parquet"),
         "inf_ret": (d / f"{p}INFRET/inf_ret.txt", RECTIFICATIVAS, o / f"rectificativas/publicado={p}/inf_ret.parquet"),
@@ -103,14 +118,15 @@ def trabajos(d: pathlib.Path, o: pathlib.Path, p: int, padron: int) -> dict:
 
 
 def convertir_todo(d: pathlib.Path, o: pathlib.Path, p: int, padron: int, memoria: str = "8GB",
-                   tmp: pathlib.Path | None = None, solo: list[str] | None = None) -> dict[str, int]:
-    """Convierte el paquete mensual y el padrón; devuelve las filas de cada archivo."""
+                   tmp: pathlib.Path | None = None, solo: list[str] | None = None,
+                   cheques: int | None = None) -> dict[str, int]:
+    """Convierte el paquete mensual, el padrón y (si se indica) la foto de cheques; devuelve las filas de cada archivo."""
     tmp = tmp or o / "_tmp_conv"
     tmp.mkdir(parents=True, exist_ok=True)
     c = duckdb.connect()
     c.execute(f"SET memory_limit = '{memoria}'; SET preserve_insertion_order = false;")
     filas = {}
-    for nombre, (src, campos, dst) in trabajos(d, o, p, padron).items():
+    for nombre, (src, campos, dst) in trabajos(d, o, p, padron, cheques).items():
         if solo and nombre not in solo:
             continue
         t = time.time()
@@ -124,11 +140,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("downloads"); ap.add_argument("salida")
     ap.add_argument("--periodo", type=int, required=True); ap.add_argument("--padron", type=int, required=True)
+    ap.add_argument("--cheques", type=int, help="fecha AAAAMMDD de la foto de cheques rechazados (AAAAMMDDCHEQUES)")
     ap.add_argument("--memoria", default="8GB"); ap.add_argument("--solo", nargs="*")
     ap.add_argument("--tmp", default="/tmp/cendeu_conv", help="dir para copias recodificadas")
     a = ap.parse_args()
     convertir_todo(pathlib.Path(a.downloads), pathlib.Path(a.salida), a.periodo, a.padron, a.memoria,
-                   pathlib.Path(a.tmp), a.solo)
+                   pathlib.Path(a.tmp), a.solo, a.cheques)
 
 
 if __name__ == "__main__":
